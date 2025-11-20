@@ -1,34 +1,47 @@
 // import '../config/config.dart';
-import '../config/data_base.dart';
+import '../config/database.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 class DataRetriever {
-  static String get audioMapURL => DataBase.audioMapURL;
-  static String get storyMapURL => DataBase.storyMapURL;
-  static String get storyDataURL => DataBase.storyDataURL;
 
-  static Future<dynamic> getAudioMap() => _getJsonFromURL(audioMapURL);
-  static Future<dynamic> getStoryMap() => _getJsonFromURL(storyMapURL);
+  static Future<dynamic> getStoryMetaTable() async {
+    final json = await getJsonFromURL(Database.dataSourceURL + "/" + Database.storyMetaTablePath);
+    return json;
+  }
 
-  static Future<Map<String, dynamic>?> _getJsonFromURL(String url) async {
+  // get audio url from audio_data.json by name
+  // static Future<List<String?>?> getAudioURLByName(String name) async {
+  //   final json = await getJsonFromURL(Database.audioDataURL);
+  //   for (final entry in json["bgmBanks"]) {
+  //     if (entry['name'] == name) {
+  //       return [Database.assetsSourceURL + "torappu/dynamicassets/" + (entry['intro'] as String).toLowerCase() + ".mp3", 
+  //       Database.assetsSourceURL + "torappu/dynamicassets/" + (entry['loop'] as String).toLowerCase() + ".mp3"];
+  //     }
+  //   }
+  //   return null;
+  // }
+
+  // static Future<dynamic> getAudioData() async {
+  //   return await getJsonFromURL(Database.audioDataURL);
+  // }
+
+  static Future<dynamic> getJsonFromURL(String url) async {
     try {
-      final res = await http.get(Uri.parse(url));
-      if (res.statusCode != 200) {
-        debugPrint("HTTP ${res.statusCode} for $url");
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        debugPrint("HTTP ${response.statusCode} for $url");
         return null;
       }
-
-      final text = utf8.decode(res.bodyBytes); // UTF-8 safe
-      return jsonDecode(text);
+      return jsonDecode(utf8.decode(response.bodyBytes));
     } catch (e) {
       debugPrint("Error fetching $url — $e");
       return null;
     }
   }
 
-  static Future<String?> _getTextFromURL(String url) async {
+  static Future<String?> getTextFromURL(String url) async {
     try {
       final res = await http.get(Uri.parse(url));
 
@@ -41,26 +54,3 @@ class DataRetriever {
     }
   }
 }
-
-// void main() async {
-//   // final url = "https://raw.githubusercontent.com/ArknightsAssets/ArknightsGamedata/master/cn/gamedata/story/activities/a001/level_a001_01_end.txt";
-//   // final text = await DataRetriever._getTextFromURL(url);
-//   // debugPrint("Text fetch result:\n$text");
-//   final json = await DataRetriever.getStoryMap();
-
-//   if (json == null) {
-//     print("❌ Failed to load JSON");
-//     return;
-//   }
-
-//   // // Get first key in map
-//   // final firstKey = json.keys.first;
-//   // final firstValue = json[firstKey][0]["intro"];
-
-//   // print("✅ First entry key: $firstKey");
-//   // print("✅ First entry value snippet: ${firstValue}");
-//   final keys = json.keys;
-//   for (var key in keys) {
-//     debugPrint("Key: $key; name: ${json[key]["name"]}");
-//   }
-// }

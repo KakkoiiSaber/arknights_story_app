@@ -1,92 +1,41 @@
-// lib/utils/audio_manager.dart
-import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 
+final audio = AudioManager();
+
 class AudioManager {
-  static final AudioManager _instance = AudioManager._internal();
-  factory AudioManager() => _instance;
-  AudioManager._internal();
+  final AudioPlayer _intro = AudioPlayer();
+  final AudioPlayer _loop = AudioPlayer();
 
-  final AudioPlayer _introPlayer = AudioPlayer();
-  final AudioPlayer _loopPlayer = AudioPlayer();
-  bool _isMuted = false;
-  bool _isPreloaded = false;
-
-  final String _introUrl =
-      "https://raw.githubusercontent.com/akgcc/arkdata/main/assets/torappu/dynamicassets/audio/sound_beta_2/music/beta1_180603/m_sys_void_intro.mp3";
-  final String _loopUrl =
-      "https://raw.githubusercontent.com/akgcc/arkdata/main/assets/torappu/dynamicassets/audio/sound_beta_2/music/beta1_180603/m_sys_void_loop.mp3";
-
-  /// Preload both intro and loop audio into memory
-  Future<void> preload() async {
-    if (_isPreloaded) return;
-    await _introPlayer.setSource(UrlSource(_introUrl));
-    await _loopPlayer.setSource(UrlSource(_loopUrl));
-    await _loopPlayer.setReleaseMode(ReleaseMode.loop);
-    _isPreloaded = true;
+  Future<void> init() async {
+    await _intro.setReleaseMode(ReleaseMode.stop);
+    await _loop.setReleaseMode(ReleaseMode.loop);
   }
 
-  /// Initialize playback (assumes preload() done first)
-  Future<void> init({
-    double volume = 0.5,
-    Duration crossFade = const Duration(milliseconds: 400),
-  }) async {
-    if (!_isPreloaded) await preload();
+  // urls = [introURL, loopURL]
+  Future<void> themeOST(List<String> urls) async {
+    final introURL = urls[0];
+    final loopURL = urls[1];
 
-    await _introPlayer.setVolume(volume);
-    await _loopPlayer.setVolume(0);
+    // Pre-set sources (kicks off buffering)
+    await Future.wait([
+      _intro.setSource(UrlSource(introURL)),
+      _loop.setSource(UrlSource(loopURL)),
+    ]);
 
-    // Start intro
-    await _introPlayer.resume();
-
-    // Schedule crossfade near intro end
-    _introPlayer.onDurationChanged.listen((totalDuration) {
-      if (totalDuration.inMilliseconds > 0) {
-        final triggerTime = totalDuration - crossFade;
-        _introPlayer.onPositionChanged.listen((pos) async {
-          if (pos >= triggerTime) {
-            _introPlayer.onPositionChanged.drain(); // prevent multiple calls
-            await _loopPlayer.resume();
-            _startCrossFade(volume, crossFade);
-          }
-        });
-      }
-    });
-
-    // Ensure loop continues after intro finishes
-    _introPlayer.onPlayerComplete.listen((_) async {
-      await _loopPlayer.resume();
-      await _loopPlayer.setVolume(_isMuted ? 0.0 : volume);
+    // Play intro, then start loop immediately after completion
+    await _intro.resume();
+    _intro.onPlayerComplete.first.then((_) async {
+      await _loop.resume();
     });
   }
 
-  Future<void> _startCrossFade(double targetVolume, Duration duration) async {
-    const int steps = 20;
-    final double stepVol = targetVolume / steps;
-    final int stepMs = (duration.inMilliseconds / steps).round();
-
-    for (int i = 0; i <= steps; i++) {
-      if (_isMuted) break;
-      final fadeOut = targetVolume - (stepVol * i);
-      final fadeIn = stepVol * i;
-      _introPlayer.setVolume(fadeOut);
-      _loopPlayer.setVolume(fadeIn);
-      await Future.delayed(Duration(milliseconds: stepMs));
-    }
+  Future<void> stop() async {
+    await _intro.stop();
+    await _loop.stop();
   }
-
-  void toggleMute() {
-    _isMuted = !_isMuted;
-    final double volume = _isMuted ? 0.0 : 0.5;
-    _introPlayer.setVolume(volume);
-    _loopPlayer.setVolume(volume);
-  }
-
-  bool get isMuted => _isMuted;
 
   Future<void> dispose() async {
-    await _introPlayer.dispose();
-    await _loopPlayer.dispose();
-    _isPreloaded = false;
+    await _intro.dispose();
+    await _loop.dispose();
   }
 }
