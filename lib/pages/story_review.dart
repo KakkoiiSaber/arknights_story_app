@@ -125,6 +125,12 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                     final candiWidth3 = _optContentWidth;
                     final targetWidth =
                         available < _maxContentWidth ? candiWidth1 : math.max(candiWidth2, candiWidth3);
+                    final isWide = constraints.maxWidth >= 800;
+                    final titleSize = isWide ? 18.0 : 16.0;
+                    final codeSize = isWide ? 13.0 : 12.0;
+                    final descSize = isWide ? 15.0 : 14.0;
+                    final primaryText = Colors.white.withOpacity(0.92);
+                    final secondaryText = Colors.white70;
 
                     return Align(
                       alignment: Alignment.topRight,
@@ -139,7 +145,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                 style: Theme.of(context)
                                     .textTheme
                                     .headlineSmall
-                                    ?.copyWith(color: Colors.white),
+                                    ?.copyWith(
+                                      color: primaryText,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                               ),
                               if (id != null) ...[
                                 const SizedBox(height: 4),
@@ -157,7 +166,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleMedium
-                                    ?.copyWith(color: Colors.white),
+                                    ?.copyWith(color: primaryText),
                               ),
                               const SizedBox(height: 8),
                               ...infoUnlockDatas.map<Widget>((info) {
@@ -179,10 +188,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                     vertical: 10,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.45),
+                                    color: Colors.black.withOpacity(0.5),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                        color: Colors.white.withOpacity(0.2)),
+                                        color: Colors.white.withOpacity(0.12)),
                                   ),
                                   child: Column(
                                     crossAxisAlignment:
@@ -199,16 +208,18 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                               children: [
                                                 Text(
                                                   storyName,
-                                                  style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 16),
+                                                  style: TextStyle(
+                                                      color: primaryText,
+                                                      fontSize: titleSize,
+                                                      fontWeight:
+                                                          FontWeight.w600),
                                                 ),
                                                 if (storyCode != null)
                                                   Text(
                                                     storyCode,
-                                                    style: const TextStyle(
-                                                        color: Colors.white70,
-                                                        fontSize: 12),
+                                                    style: TextStyle(
+                                                        color: secondaryText,
+                                                        fontSize: codeSize),
                                                   ),
                                               ],
                                             ),
@@ -227,20 +238,22 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                               ),
                                               child: Text(
                                                 tag,
-                                                style: const TextStyle(
-                                                    color: Colors.white70,
-                                                    fontSize: 12),
+                                                style: TextStyle(
+                                                    color: secondaryText,
+                                                    fontSize: codeSize),
                                               ),
                                             ),
                                         ],
                                       ),
                                       if (storyDesc.isNotEmpty) ...[
-                                        const SizedBox(height: 6),
+                                        const SizedBox(height: 8),
                                         Text(
                                           storyDesc,
-                                          style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 12),
+                                          style: TextStyle(
+                                            color: secondaryText,
+                                            fontSize: descSize,
+                                            height: 1.4,
+                                          ),
                                         ),
                                       ],
                                     ],
