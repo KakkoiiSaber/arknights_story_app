@@ -120,9 +120,11 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final available = constraints.maxWidth;
-                    final best = _maxContentWidth - (available - _optContentWidth);
+                    final candiWidth1 = available;
+                    final candiWidth2 = _maxContentWidth - (available - _maxContentWidth);
+                    final candiWidth3 = _optContentWidth;
                     final targetWidth =
-                        available < _maxContentWidth ? available : math.max(best, _optContentWidth);
+                        available < _maxContentWidth ? candiWidth1 : math.max(candiWidth2, candiWidth3);
 
                     return Align(
                       alignment: Alignment.topRight,
@@ -163,8 +165,12 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                 final storyName =
                                     infoMap?['storyName'] as String? ?? '';
                                 final tag = infoMap?['avgTag'] as String?;
-                                final storyCode = infoMap?['storyCode'] as String?;
-                                final descPath = infoMap?['descPath'] as String?;
+                                final storyCode =
+                                    infoMap?['storyCode'] as String?;
+                                final storyDesc = (infoMap?['storyDesc'] ??
+                                        '')
+                                    .toString()
+                                    .trim();
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 8),
@@ -178,48 +184,65 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                     border: Border.all(
                                         color: Colors.white.withOpacity(0.2)),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              storyName,
-                                              style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 16),
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  storyName,
+                                                  style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 16),
+                                                ),
+                                                if (storyCode != null)
+                                                  Text(
+                                                    storyCode,
+                                                    style: const TextStyle(
+                                                        color: Colors.white70,
+                                                        fontSize: 12),
+                                                  ),
+                                              ],
                                             ),
-                                            if (storyCode != null)
-                                              Text(
-                                                storyCode,
+                                          ),
+                                          if (tag != null)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white
+                                                    .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                tag,
                                                 style: const TextStyle(
                                                     color: Colors.white70,
                                                     fontSize: 12),
                                               ),
-                                          ],
-                                        ),
+                                            ),
+                                        ],
                                       ),
-                                      if (tag != null)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.1),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            tag,
-                                            style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 12),
-                                          ),
+                                      if (storyDesc.isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          storyDesc,
+                                          style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12),
                                         ),
+                                      ],
                                     ],
                                   ),
                                 );

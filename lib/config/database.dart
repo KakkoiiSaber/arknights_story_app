@@ -8,7 +8,7 @@ class Database {
   static const assetsSourceURL2 = "https://raw.githubusercontent.com/KakkoiiSaber/arkdata/main";
 
   // to store story data and assets
-  static String dataSourceURL2 = "https://raw.githubusercontent.com/ArknightsAssets/ArknightsGamedata/main";
+  static String dataSourceURL2 = "https://raw.githubusercontent.com/ArknightsAssets/ArknightsGamedata/master";
   // static const assetsSourceURL2 = "https://raw.githubusercontent.com/akgcc/arkdata/main";
 
   static String storyMetaTablePath = "$dataSourceURL1/assets/${Config.server}/story_meta_table.json";
@@ -17,6 +17,8 @@ class Database {
   static const kvImagePath = "$assetsSourceURL1/assets/torappu/dynamicassets/arts/ui/mixstory/kvs/";
   static const titleImagePath = "$assetsSourceURL1/assets/torappu/dynamicassets/arts/ui/mixstory/titles/";
   static const backgroundPath = "$assetsSourceURL1/assets/torappu/dynamicassets/arts/ui/mixstory/retrobkgs/";
+
+  static String storyInfoPath = "$dataSourceURL2/${Config.server}/gamedata/story/";
 
   static const musicPath = "$assetsSourceURL2/assets/torappu/dynamicassets/";
 }
