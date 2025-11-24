@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:audioplayers/audioplayers.dart';
 
 final audio = AudioManager();
@@ -11,22 +13,43 @@ class AudioManager {
     await _loop.setReleaseMode(ReleaseMode.loop);
   }
 
-  // urls = [introURL, loopURL]
-  Future<void> themeOST(List<String> urls) async {
-    final introURL = urls[0];
-    final loopURL = urls[1];
+  // play only once intro
+  Future<void> intro(String? url) async {
+    if (!await _setSourceSafely(_intro, url)) return;
+    await _resumeSafely(_intro);
+  }
 
-    // Pre-set sources (kicks off buffering)
-    await Future.wait([
-      _intro.setSource(UrlSource(introURL)),
-      _loop.setSource(UrlSource(loopURL)),
-    ]);
+  // play looped music
+  Future<void> loop(String? url) async {
+    if (!await _setSourceSafely(_loop, url)) return;
+    await _resumeSafely(_loop);
+  }
+
+  Future<void> intro2loop(String? introURL, String? loopURL) async {
+    final introReady = await _setSourceSafely(_intro, introURL);
+    final loopReady = await _setSourceSafely(_loop, loopURL);
+
+    // If the loop track fails to load, don't start playback to avoid errors.
+    if (!loopReady) return;
 
     // Play intro, then start loop immediately after completion
-    await _intro.resume();
-    _intro.onPlayerComplete.first.then((_) async {
-      await _loop.resume();
-    });
+    if (introReady) {
+      final playedIntro = await _resumeSafely(_intro);
+      if (!playedIntro) {
+        await _resumeSafely(_loop);
+        return;
+      }
+      _intro.onPlayerComplete.first.then((_) async {
+        await _resumeSafely(_loop);
+      }).catchError((Object e, StackTrace st) {
+        log('Audio onPlayerComplete -> loop failed: $e',
+            stackTrace: st, name: 'AudioManager');
+      });
+      return;
+    }
+
+    // If intro failed, start loop directly.
+    await _resumeSafely(_loop);
   }
 
   Future<void> stop() async {
@@ -37,5 +60,27 @@ class AudioManager {
   Future<void> dispose() async {
     await _intro.dispose();
     await _loop.dispose();
+  }
+
+  Future<bool> _setSourceSafely(AudioPlayer player, String? url) async {
+    if (url == null || url.isEmpty) return false;
+
+    try {
+      await player.setSource(UrlSource(url));
+      return true;
+    } catch (e, st) {
+      log('Audio setSource failed for $url: $e', stackTrace: st, name: 'AudioManager');
+      return false;
+    }
+  }
+
+  Future<bool> _resumeSafely(AudioPlayer player) async {
+    try {
+      await player.resume();
+      return true;
+    } catch (e, st) {
+      log('Audio resume failed: $e', stackTrace: st, name: 'AudioManager');
+      return false;
+    }
   }
 }

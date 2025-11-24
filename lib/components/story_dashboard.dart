@@ -45,8 +45,8 @@ class StoryDashboard extends StatelessWidget {
                   for (final id in ids)
                     StoryEntry(
                       name: table[id]['name'],
-                      kvImage: NetworkImage(Database.assetsSourceURL + "/" + Database.kvImagePath + "/" + table[id]['kvImageId']),
-                      titleImage: table[id]['entryType'] != "MAINLINE" ? NetworkImage(Database.assetsSourceURL + "/" + Database.titleImagePath + "/" + table[id]['titleImageId']) : null,
+                      kvImage: NetworkImage(Database.kvImagePath + table[id]['kvImageId']),
+                      titleImage: table[id]['entryType'] != "MAINLINE" ? NetworkImage(Database.titleImagePath + table[id]['titleImageId']) : null,
                       onTap: () => onEntryType(context, table[id]),
                     ),
                 ],
