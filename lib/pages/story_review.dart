@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../config/database.dart';
 import '../utils/audio_manager.dart';
@@ -12,6 +14,9 @@ class StoryReviewPage extends StatefulWidget {
 }
 
 class _StoryReviewPageState extends State<StoryReviewPage> {
+  static const double _maxContentWidth = 1080;
+  static const double _optContentWidth = 700;
+
   Map<String, dynamic> get storyInfo => widget.storyInfo;
 
   String? get id => storyInfo['id'] as String?;
@@ -20,6 +25,8 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   String? get gameMusicName => storyInfo['gameMusicName'] as String?;
   List<dynamic> get infoUnlockDatas =>
       (storyInfo['infoUnlockDatas'] as List<dynamic>?) ?? const [];
+
+  bool _bgLoaded = false;
 
   @override
   void initState() {
@@ -70,16 +77,38 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         children: [
           if (hasBackground)
             Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: NetworkImage(Database.backgroundPath + backgroundId!),
-                    fit: BoxFit.cover,
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.35),
-                      BlendMode.darken,
+              child: AnimatedOpacity(
+                opacity: _bgLoaded ? 1 : 0,
+                duration: const Duration(milliseconds: 2000),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      Database.backgroundPath + backgroundId!,
+                      fit: BoxFit.cover,
+                      // Bias view to ~30% from the left so important left-side art stays visible on narrow widths.
+                      alignment: const Alignment(-0.5, 0),
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null && !_bgLoaded) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) setState(() => _bgLoaded = true);
+                          });
+                        }
+                        return child;
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        if (_bgLoaded) return const SizedBox.shrink();
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) setState(() => _bgLoaded = false);
+                        });
+                        return const SizedBox.shrink();
+                      },
                     ),
-                  ),
+                    // Darken background for readability.
+                    Container(
+                      color: Colors.black.withOpacity(0.2),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -88,95 +117,119 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
               padding: const EdgeInsets.all(16),
               color: hasBackground ? Colors.black.withOpacity(0.25) : null,
               child: SafeArea(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name ?? '',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(color: Colors.white),
-                      ),
-                      if (id != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          id!,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(color: Colors.white70),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      Text(
-                        'Stories',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(color: Colors.white),
-                      ),
-                      const SizedBox(height: 8),
-                      ...infoUnlockDatas.map<Widget>((info) {
-                        final infoMap = info as Map?;
-                        final storyName = infoMap?['storyName'] as String? ?? '';
-                        final tag = infoMap?['avgTag'] as String?;
-                        final storyId = infoMap?['storyId'] as String?;
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final available = constraints.maxWidth;
+                    final best = _maxContentWidth - (available - _optContentWidth);
+                    final targetWidth =
+                        available < _maxContentWidth ? available : math.max(best, _optContentWidth);
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.45),
-                            borderRadius: BorderRadius.circular(10),
-                            border:
-                                Border.all(color: Colors.white.withOpacity(0.2)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    return Align(
+                      alignment: Alignment.topRight,
+                      child: SizedBox(
+                        width: targetWidth,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      storyName,
-                                      style: const TextStyle(
-                                          color: Colors.white, fontSize: 16),
-                                    ),
-                                    if (storyId != null)
-                                      Text(
-                                        storyId,
-                                        style: const TextStyle(
-                                            color: Colors.white70, fontSize: 12),
-                                      ),
-                                  ],
-                                ),
+                              Text(
+                                name ?? '',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(color: Colors.white),
                               ),
-                              if (tag != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    tag,
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12),
-                                  ),
+                              if (id != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  id!,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(color: Colors.white70),
                                 ),
+                              ],
+                              const SizedBox(height: 16),
+                              Text(
+                                'Stories',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(color: Colors.white),
+                              ),
+                              const SizedBox(height: 8),
+                              ...infoUnlockDatas.map<Widget>((info) {
+                                final infoMap = info as Map?;
+                                final storyName =
+                                    infoMap?['storyName'] as String? ?? '';
+                                final tag = infoMap?['avgTag'] as String?;
+                                final storyCode = infoMap?['storyCode'] as String?;
+                                final descPath = infoMap?['descPath'] as String?;
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.45),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                        color: Colors.white.withOpacity(0.2)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              storyName,
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 16),
+                                            ),
+                                            if (storyCode != null)
+                                              Text(
+                                                storyCode,
+                                                style: const TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 12),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (tag != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.white.withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            tag,
+                                            style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              }),
                             ],
                           ),
-                        );
-                      }),
-                    ],
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
