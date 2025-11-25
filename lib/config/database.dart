@@ -1,24 +1,27 @@
 import 'config.dart';
 
 class Database {
-  // to store processed meta data and assets for cover, title, bg
-  static String dataSourceURL1 = "https://raw.githubusercontent.com/KakkoiiSaber/arknights_story_data/main";
-  static const assetsSourceURL1 = "https://raw.githubusercontent.com/KakkoiiSaber/arkdata/main";
-  // static const assetsSourceURL1 = "https://raw.githubusercontent.com/KakkoiiSaber/arkdata/dev_bg_music";
-  static const assetsSourceURL2 = "https://raw.githubusercontent.com/KakkoiiSaber/arkdata/main";
+  // path to story review meta data, review info
+  static String reviewDataURL = "https://raw.githubusercontent.com/KakkoiiSaber/arknights_story_data/main";
+  
+  static String storyMetaTablePath = "$reviewDataURL/assets/${Config.server}/story_meta_table.json";
+  static String gameMusicDataPath = "$reviewDataURL/assets/${Config.server}/audio_data.json";
+  static String reviewInfoPath = "$reviewDataURL/assets/${Config.server}/story_review_info/";
 
-  // to store story data and assets
-  static String dataSourceURL2 = "https://raw.githubusercontent.com/ArknightsAssets/ArknightsGamedata/master";
-  // static const assetsSourceURL2 = "https://raw.githubusercontent.com/akgcc/arkdata/main";
+  // path to story review assets
+  static const reviewAssetsURL = "https://raw.githubusercontent.com/KakkoiiSaber/arkdata/main";
+  //story cover images
+  static const kvImagePath = "$reviewAssetsURL/assets/torappu/dynamicassets/arts/ui/mixstory/kvs/";
+  // story title images
+  static const titleImagePath = "$reviewAssetsURL/assets/torappu/dynamicassets/arts/ui/mixstory/titles/";
+  // story review background images
+  static const backgroundPath = "$reviewAssetsURL/assets/torappu/dynamicassets/arts/ui/mixstory/retrobkgs/";
+  // story review music assets
+  static const gameMusicPath = "$reviewAssetsURL/assets/torappu/dynamicassets/";
 
-  static String storyMetaTablePath = "$dataSourceURL1/assets/${Config.server}/story_meta_table.json";
-  static String gameMusicTablePath = "$dataSourceURL1/assets/${Config.server}/audio_table.json";
+  // path to story data
+  static String storyDataURLCN = "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master";
+  static String storyDataURLGlobal = "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData_YoStar/main";
 
-  static const kvImagePath = "$assetsSourceURL1/assets/torappu/dynamicassets/arts/ui/mixstory/kvs/";
-  static const titleImagePath = "$assetsSourceURL1/assets/torappu/dynamicassets/arts/ui/mixstory/titles/";
-  static const backgroundPath = "$assetsSourceURL1/assets/torappu/dynamicassets/arts/ui/mixstory/retrobkgs/";
 
-  static String storyInfoPath = "$dataSourceURL2/${Config.server}/gamedata/story/";
-
-  static const musicPath = "$assetsSourceURL2/assets/torappu/dynamicassets/";
 }

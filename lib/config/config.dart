@@ -1,7 +1,7 @@
 class Config {
   static bool isSoundEnabled = true;
-  static List<String> serverList = ["en", "jp", "kr", "cn"];
-  static String server = "cn";
+  static List<String> serverList = ["zh_CN", "en_US", "ja_JP", "ko_KR"];
+  static String server = "zh_CN";
 
 
   static void setServer(String server){

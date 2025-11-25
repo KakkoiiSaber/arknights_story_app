@@ -18,17 +18,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _playHomeMusic() async {
-    final audioTable = await DataRetriever.getJsonFromURL(Database.gameMusicTablePath);
+    final audioTable = await DataRetriever.getJsonFromURL(Database.gameMusicDataPath);
     final homeBgMusicInfo = audioTable["sys.ON_MUSIC.bg_void"];
-    final String intro = homeBgMusicInfo["intro"];
-    final String loop = homeBgMusicInfo["loop"];
-    await audio.intro2loop(Database.musicPath + intro, Database.musicPath + loop);
+    final String introPath = homeBgMusicInfo["intro"];
+    final String loopPath = homeBgMusicInfo["loop"];
+    await audio.intro2loop(Database.gameMusicPath + introPath, Database.gameMusicPath + loopPath);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Home Page')),
+      appBar: AppBar(title: const Text('Home')),
       body: StoryDashboard(storyMetaTableFuture:  DataRetriever.getJsonFromURL(Database.storyMetaTablePath),),
     );
   }

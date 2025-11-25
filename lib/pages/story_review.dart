@@ -21,6 +21,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
   String? get id => storyInfo['id'] as String?;
   String? get name => storyInfo['name'] as String?;
+  String? get desc => storyInfo['desc'] as String?;
   String? get backgroundId => storyInfo['backgroundId'] as String?;
   String? get gameMusicName => storyInfo['gameMusicName'] as String?;
   List<dynamic> get infoUnlockDatas =>
@@ -38,23 +39,23 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     final musicKey = gameMusicName;
     if (musicKey == null) return;
 
-    final audioTable = await DataRetriever.getJsonFromURL(Database.gameMusicTablePath);
+    final audioTable = await DataRetriever.getJsonFromURL(Database.gameMusicDataPath);
 
     final trackInfo = audioTable[musicKey];
     if (trackInfo is! Map) return;
 
-    final intro = trackInfo['intro'] as String?;
-    final loop = trackInfo['loop'] as String?;
+    final introPath = trackInfo['intro'] as String?;
+    final loopPath = trackInfo['loop'] as String?;
 
-    if (intro == null && loop == null) return;
-    if (intro == null && loop != null) {
-      await audio.loop(Database.musicPath + loop);
+    if (introPath == null && loopPath == null) return;
+    if (introPath == null && loopPath != null) {
+      await audio.loop(Database.gameMusicPath + loopPath);
       return;
     }
-    if (intro != null && loop != null) {
+    if (introPath != null && loopPath != null) {
       await audio.intro2loop(
-        Database.musicPath + intro,
-        Database.musicPath + loop,
+        Database.gameMusicPath + introPath,
+        Database.gameMusicPath + loopPath,
       );
       return;
     }
@@ -121,7 +122,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                   builder: (context, constraints) {
                     final available = constraints.maxWidth;
                     final candiWidth1 = available;
-                    final candiWidth2 = _maxContentWidth - (available - _maxContentWidth);
+                    final candiWidth2 = _maxContentWidth - 2 * (available - _maxContentWidth);
                     final candiWidth3 = _optContentWidth;
                     final targetWidth =
                         available < _maxContentWidth ? candiWidth1 : math.max(candiWidth2, candiWidth3);

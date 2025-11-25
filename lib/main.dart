@@ -14,7 +14,7 @@ class ArknightsStoryApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Arknights Story',
+      title: 'ArkStory',
       theme: ThemeData.dark(),
       home: const HomePage(),
     );
