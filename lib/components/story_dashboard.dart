@@ -50,25 +50,44 @@ class StoryDashboard extends StatelessWidget {
         return SingleChildScrollView(
           child: SizedBox(
             width: MediaQuery.of(context).size.width,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                runAlignment: WrapAlignment.center,
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  for (final id in ids)
-                    StoryEntry(
-                      name: table[id]['name'],
-                      kvImage: table[id]['kvImageId'] != null ? NetworkImage(Database.kvImagePath + table[id]['kvImageId']) : null,
-                      titleImage: table[id]['type'] != "MAIN_STORY" ? (table[id]['titleImageId'] != null ? NetworkImage(Database.titleImagePath + table[id]['titleImageId']) : null) : null,
-                      onTap: () {
-                        onEntryType(context, id.toString());
-                      },
-                    ),
-                ],
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const double spacing = 16;
+                const double padding = 16;
+                const int minPerRow = 3;
+                final double available =
+                    (constraints.maxWidth - padding * 2).clamp(0, double.infinity);
+                final double rawTargetWidth =
+                    (available - spacing * (minPerRow - 1)) / minPerRow;
+                final double cardWidth =
+                    rawTargetWidth <= 0 ? 120 : (rawTargetWidth > 250 ? 250 : rawTargetWidth);
+                final bool isCompact = cardWidth < 220;
+                final double cardHeight =
+                    isCompact ? cardWidth * 1.8 : cardWidth * 1.2;
+
+                return Padding(
+                  padding: const EdgeInsets.all(padding),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    runAlignment: WrapAlignment.center,
+                    spacing: spacing,
+                    runSpacing: spacing,
+                    children: [
+                      for (final id in ids)
+                        StoryEntry(
+                          name: table[id]['name'],
+                          kvImage: table[id]['kvImageId'] != null ? NetworkImage(Database.kvImagePath + table[id]['kvImageId']) : null,
+                          titleImage: table[id]['type'] != "MAIN_STORY" ? (table[id]['titleImageId'] != null ? NetworkImage(Database.titleImagePath + table[id]['titleImageId']) : null) : null,
+                          width: cardWidth,
+                          height: cardHeight,
+                          onTap: () {
+                            onEntryType(context, id.toString());
+                          },
+                        ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         );

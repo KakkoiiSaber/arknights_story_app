@@ -6,6 +6,8 @@ class StoryEntry extends StatelessWidget {
   final ImageProvider? kvImage;
   final ImageProvider? titleImage;
   final VoidCallback onTap;
+  final double? width;
+  final double? height;
 
   const StoryEntry({
     super.key,
@@ -13,22 +15,28 @@ class StoryEntry extends StatelessWidget {
     required this.kvImage,
     required this.titleImage,
     required this.onTap,
+    this.width,
+    this.height,
   });
 
   @override
   Widget build(BuildContext context) {
+    final double cardWidth = width ?? 250;
+    final double cardHeight = height ?? 300;
+    final double imageHeight = cardHeight - 48;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        height: 300,
-        width: 250,
+        height: cardHeight,
+        width: cardWidth,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
-              height: 250,
-              width: 250,
+              height: imageHeight,
+              width: cardWidth,
               child: ClipRRect(
                 // borderRadius: BorderRadius.circular(8),
                 borderRadius: BorderRadius.circular(16),
@@ -72,7 +80,8 @@ class StoryEntry extends StatelessWidget {
               name,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              maxLines: 2,
+              maxLines: 1,
+              softWrap: false,
             ),
           ],
         ),
@@ -80,4 +89,3 @@ class StoryEntry extends StatelessWidget {
     );
   }
 }
-
