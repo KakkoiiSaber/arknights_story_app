@@ -36,19 +36,19 @@ class StoryEntry extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     Container(
-                      decoration: BoxDecoration(
-                        // color: Colors.grey[800],
-                        color: const Color.fromARGB(88, 101, 97, 93),
-                        image: kvImage != null
-                            ? DecorationImage(
+                      decoration: const BoxDecoration(
+                        color: Color.fromARGB(88, 101, 97, 93),
+                      ),
+                      child: kvImage == null
+                          ? const Icon(Icons.image)
+                          : Transform.scale(
+                              scale: 1.1,
+                              child: Image(
                                 image: kvImage!,
                                 fit: BoxFit.fitHeight,
-                                // fit: BoxFit.contain,
-                              )
-                            : null,
-                      ),
-                      child:
-                          kvImage == null ? const Icon(Icons.image) : null,
+                                alignment: Alignment.center,
+                              ),
+                            ),
                     ),
                     if (titleImage != null)
                         Align(
@@ -80,5 +80,4 @@ class StoryEntry extends StatelessWidget {
     );
   }
 }
-
 

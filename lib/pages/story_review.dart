@@ -14,8 +14,7 @@ class StoryReviewPage extends StatefulWidget {
 }
 
 class _StoryReviewPageState extends State<StoryReviewPage> {
-  static const double _maxContentWidth = 1080;
-  static const double _optContentWidth = 700;
+  static const double _layoutSwitchSize = 1080;
 
   Map<String, dynamic> get storyInfo => widget.storyInfo;
 
@@ -73,7 +72,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     final hasBackground = backgroundId?.isNotEmpty ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: Text(name ?? 'Story')),
+      // appBar: AppBar(title: Text(name ?? 'Story')),
       body: Stack(
         children: [
           if (hasBackground)
@@ -121,11 +120,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final available = constraints.maxWidth;
-                    final candiWidth1 = available;
-                    final candiWidth2 = _maxContentWidth - 2 * (available - _maxContentWidth);
-                    final candiWidth3 = _optContentWidth;
-                    final targetWidth =
-                        available < _maxContentWidth ? candiWidth1 : math.max(candiWidth2, candiWidth3);
+                    final  targetWidth = available > _layoutSwitchSize? 0.4*available: available;
                     final isWide = constraints.maxWidth >= 800;
                     final titleSize = isWide ? 18.0 : 16.0;
                     final codeSize = isWide ? 13.0 : 12.0;
@@ -151,10 +146,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                       fontWeight: FontWeight.w600,
                                     ),
                               ),
-                              if (id != null) ...[
+                              if (desc != null) ...[
                                 const SizedBox(height: 4),
                                 Text(
-                                  id!,
+                                  desc!,
                                   style: Theme.of(context)
                                       .textTheme
                                       .labelLarge
@@ -267,6 +262,24 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                       ),
                     );
                   },
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 12,
+            left: 12,
+            child: SafeArea(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  // icon: const Icon(Icons.home, color: Colors.white),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  tooltip: 'Back',
                 ),
               ),
             ),
