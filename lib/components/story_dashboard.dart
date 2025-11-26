@@ -64,27 +64,38 @@ class StoryDashboard extends StatelessWidget {
                 final bool isCompact = cardWidth < 220;
                 final double cardHeight =
                     isCompact ? cardWidth * 1.8 : cardWidth * 1.2;
+                final int columns =
+                    ((available + spacing) / (cardWidth + spacing)).floor().clamp(1, 12);
+                final int effectiveColumns = columns < minPerRow ? minPerRow : columns;
+                final double contentWidth =
+                    effectiveColumns * (cardWidth + spacing) - spacing;
 
                 return Padding(
                   padding: const EdgeInsets.all(padding),
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    runAlignment: WrapAlignment.center,
-                    spacing: spacing,
-                    runSpacing: spacing,
-                    children: [
-                      for (final id in ids)
-                        StoryEntry(
-                          name: table[id]['name'],
-                          kvImage: table[id]['kvImageId'] != null ? NetworkImage(Database.kvImagePath + table[id]['kvImageId']) : null,
-                          titleImage: table[id]['type'] != "MAIN_STORY" ? (table[id]['titleImageId'] != null ? NetworkImage(Database.titleImagePath + table[id]['titleImageId']) : null) : null,
-                          width: cardWidth,
-                          height: cardHeight,
-                          onTap: () {
-                            onEntryType(context, id.toString());
-                          },
-                        ),
-                    ],
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      width: contentWidth,
+                      child: Wrap(
+                        alignment: WrapAlignment.start,
+                        runAlignment: WrapAlignment.start,
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: [
+                          for (final id in ids)
+                            StoryEntry(
+                              name: table[id]['name'],
+                              kvImage: table[id]['kvImageId'] != null ? NetworkImage(Database.kvImagePath + table[id]['kvImageId']) : null,
+                              titleImage: table[id]['type'] != "MAIN_STORY" ? (table[id]['titleImageId'] != null ? NetworkImage(Database.titleImagePath + table[id]['titleImageId']) : null) : null,
+                              width: cardWidth,
+                              height: cardHeight,
+                              onTap: () {
+                                onEntryType(context, id.toString());
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               },

@@ -72,7 +72,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     final hasBackground = backgroundId?.isNotEmpty ?? false;
 
     return Scaffold(
-      // appBar: AppBar(title: Text(name ?? 'Story')),
+      // appBar: AppBar(
+      //   // title: Text(name ?? 'Story')
+      //   // backgroundColor: Colors.transparent,
+      //   ),
       body: Stack(
         children: [
           if (hasBackground)
@@ -114,7 +117,12 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
             ),
           Positioned.fill(
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.only(
+                top: 16, 
+                left: 16, 
+                right: 16,
+                // bottom: 16,
+              ),
               color: hasBackground ? Colors.black.withOpacity(0.25) : null,
               child: SafeArea(
                 child: LayoutBuilder(
