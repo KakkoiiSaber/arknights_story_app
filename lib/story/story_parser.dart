@@ -42,14 +42,13 @@ class StoryParser {
         }
 
         for (final dir in directives) {
-          final nameMatch =
-              RegExp(r'^name\s*=\s*"([^"]+)"', caseSensitive: false).firstMatch(dir);
-          if (nameMatch != null) {
-            currentSpeaker = nameMatch.group(1);
+          final nameArg = _extractArg(dir, 'name');
+          if (nameArg != null) {
+            currentSpeaker = nameArg.isEmpty ? null : nameArg;
             actions.add(
               StoryAction(
                 type: StoryActionType.nameChange,
-                payload: {'name': currentSpeaker},
+                payload: {'name': currentSpeaker ?? ''},
                 raw: raw,
               ),
             );
@@ -64,7 +63,8 @@ class StoryParser {
 
         // Dialogue: Speaker: content style
         final colonIndex = line.indexOf(':');
-        final isDialogue = colonIndex > 0 && colonIndex < line.length - 1 && !_looksLikeTimestamp(line);
+        final isDialogue =
+            colonIndex > 0 && colonIndex < line.length - 1 && !_looksLikeTimestamp(line);
         if (isDialogue) {
           final speaker = line.substring(0, colonIndex).trim();
           final text = line.substring(colonIndex + 1).trim();
@@ -164,7 +164,7 @@ class StoryParser {
 
   static String? _extractArg(String directive, String key) {
     final regex =
-        RegExp('$key\\s*=\\s*"([^"]+)"|$key\\s*=\\s*([^,\\s\\)]*)', caseSensitive: false);
+        RegExp('$key\\s*=\\s*"([^"]*)"|$key\\s*=\\s*([^,\\s\\)]*)', caseSensitive: false);
     final match = regex.firstMatch(directive);
     if (match == null) return null;
     return (match.group(1) ?? match.group(2))?.trim();
