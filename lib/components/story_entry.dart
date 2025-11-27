@@ -38,7 +38,6 @@ class StoryEntry extends StatelessWidget {
               height: imageHeight,
               width: cardWidth,
               child: ClipRRect(
-                // borderRadius: BorderRadius.circular(8),
                 borderRadius: BorderRadius.circular(16),
                 child: Stack(
                   fit: StackFit.expand,
@@ -48,7 +47,7 @@ class StoryEntry extends StatelessWidget {
                         color: Color.fromARGB(88, 101, 97, 93),
                       ),
                       child: kvImage == null
-                          ? const Icon(Icons.image)
+                          ? const Icon(Icons.image_not_supported)
                           : Transform.scale(
                               scale: 1.1,
                               child: Image(
@@ -62,9 +61,10 @@ class StoryEntry extends StatelessWidget {
                         Align(
                             alignment: Alignment.bottomCenter,
                             child: SizedBox(
-                              height: 150, 
-                              width: 200,               // constrain title image height
-                              // width: double.infinity,    // optional: stretch across the card
+                              // height: 150,
+                              // width: 200,
+                              height: cardHeight * 0.5,
+                              width: cardWidth * 0.8,
                               child: Image(
                                 image: titleImage!,
                                 fit: BoxFit.contain,   // or BoxFit.contain / cover
@@ -75,7 +75,7 @@ class StoryEntry extends StatelessWidget {
                 ),
               ),
             ),
-            // const SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               name,
               textAlign: TextAlign.center,

@@ -22,6 +22,7 @@ class Database {
   // path to story data
   static String storyDataURLCN = "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master";
   static String storyDataURLGlobal = "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData_YoStar/main";
+  static String storyContentPath = Config.server == "zh_CN" ? "$storyDataURLCN/${Config.server}/gamedata/story/" : "$storyDataURLGlobal/${Config.server}/gamedata/excel/story/";
 
 
 }

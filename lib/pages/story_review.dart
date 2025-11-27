@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../config/database.dart';
 import '../utils/audio_manager.dart';
 import '../utils/data_retriever.dart';
+import 'story.dart';
 
 class StoryReviewPage extends StatefulWidget {
   final String storyId;
+  final String? titleImageId;
   final Duration fadeDuration;
   const StoryReviewPage({
     super.key,
     required this.storyId,
+    this.titleImageId,
     this.fadeDuration = const Duration(milliseconds: 1000),
   });
 
@@ -25,6 +29,9 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   bool _bgLoaded = false;
   bool _bgReady = false;
   ImageProvider? _bgProvider;
+  bool _titleReady = false;
+  ImageProvider? _titleProvider;
+  String? _titleId;
 
   String? get id => _story?['id'] as String?;
   String? get name => _story?['name'] as String?;
@@ -40,14 +47,24 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     _loadStory();
   }
 
+  void _openStory(String storyTxt) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StoryPage(storyTxt: storyTxt),
+      ),
+    );
+  }
+
   Future<void> _loadStory() async {
     final url = '${Database.reviewInfoPath}${widget.storyId}.json';
     try {
       final fetched = await DataRetriever.getJsonFromURL(url);
       if (fetched is! Map) throw Exception('Invalid story data');
       final story = Map<String, dynamic>.from(fetched as Map);
-      final bgId = story['backgroundId'] as String?;
-      final musicKey = story['gameMusicName'] as String?;
+      final bgId = story['backgroundId']?.toString();
+      final musicKey = story['gameMusicName']?.toString();
+      final titleId =
+          widget.titleImageId ?? story['titleImageId']?.toString();
 
       if (mounted) {
         setState(() {
@@ -56,10 +73,14 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
           _bgLoaded = false;
           _bgReady = bgId == null || bgId.isEmpty;
           _bgProvider = null;
+          _titleReady = titleId == null || titleId.isEmpty;
+          _titleProvider = null;
+          _titleId = titleId;
         });
       }
 
       await _preloadBackground(bgId);
+      await _preloadTitleImage(titleId);
       await _playBgMusic(musicKey);
     } catch (e) {
       if (!mounted) return;
@@ -82,9 +103,39 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       return;
     }
 
-    final provider = NetworkImage(Database.backgroundPath + bgId);
+    final url = Database.backgroundPath + bgId;
+
+    // Quick check to avoid long hangs on missing assets.
     try {
-      await precacheImage(provider, context);
+      final res = await http.get(Uri.parse(url)).timeout(
+        const Duration(seconds: 6),
+      );
+      if (res.statusCode != 200) {
+        if (!mounted) return;
+        setState(() {
+          _bgLoaded = false;
+          _bgReady = true;
+          _bgProvider = null;
+        });
+        return;
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _bgLoaded = false;
+        _bgReady = true;
+        _bgProvider = null;
+      });
+      return;
+    }
+
+    final provider = NetworkImage(url);
+    try {
+      await precacheImage(
+        provider,
+        context,
+        onError: (_, __) {},
+      );
       if (!mounted) return;
       setState(() {
         _bgLoaded = true;
@@ -97,6 +148,34 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         _bgLoaded = false;
         _bgReady = true;
         _bgProvider = null;
+      });
+    }
+  }
+
+  Future<void> _preloadTitleImage(String? titleId) async {
+    if (titleId == null || titleId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _titleReady = true;
+          _titleProvider = null;
+        });
+      }
+      return;
+    }
+
+    final provider = NetworkImage(Database.titleImagePath + titleId);
+    try {
+      await precacheImage(provider, context);
+      if (!mounted) return;
+      setState(() {
+        _titleReady = true;
+        _titleProvider = provider;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _titleReady = true;
+        _titleProvider = null;
       });
     }
   }
@@ -158,9 +237,14 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   @override
   Widget build(BuildContext context) {
     final hasData = !_loading && _story != null;
-    final hasBackground = hasData && (backgroundId?.isNotEmpty ?? false);
+    final hasBackgroundId = hasData && (backgroundId?.isNotEmpty ?? false);
+    final showBackgroundLayer = hasData && hasBackgroundId;
+    final hasTitle = hasData && (_titleId?.isNotEmpty ?? false);
     final showError = !_loading && _error != null;
-    final canShowContent = hasData && (_bgReady || !hasBackground);
+    final canShowContent =
+        hasData &&
+        (_bgReady || !hasBackgroundId) &&
+        (_titleReady || !hasTitle);
 
     return Scaffold(
       // appBar: AppBar(
@@ -169,7 +253,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       //   ),
       body: Stack(
         children: [
-          if (hasBackground)
+          if (showBackgroundLayer)
             Positioned.fill(
               child: AnimatedOpacity(
                 opacity: _bgLoaded && _bgReady ? 1 : 0,
@@ -198,7 +282,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                 right: 16,
                 // bottom: 16,
               ),
-              color: hasBackground ? Colors.black.withOpacity(0.25) : null,
+              color: showBackgroundLayer ? Colors.black.withOpacity(0.25) : null,
               child: SafeArea(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -229,16 +313,27 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          name ?? '',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .headlineSmall
-                                              ?.copyWith(
-                                                color: primaryText,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
+                                        if (_titleProvider != null)
+                                          SizedBox(
+                                            height: 150,
+                                            width: 200,
+                                            child: Image(
+                                              image: _titleProvider!,
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
+                                        if (_titleProvider != null)
+                                          const SizedBox(height: 8),
+                                        // Text(
+                                        //   name ?? '',
+                                        //   style: Theme.of(context)
+                                        //       .textTheme
+                                        //       .headlineSmall
+                                        //       ?.copyWith(
+                                        //         color: primaryText,
+                                        //         fontWeight: FontWeight.w600,
+                                        //       ),
+                                        // ),
                                         if (desc != null) ...[
                                           const SizedBox(height: 4),
                                           Text(
@@ -270,108 +365,119 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                               infoMap?['avgTag'] as String?;
                                           final storyCode =
                                               infoMap?['storyCode'] as String?;
+                                          final storyTxt =
+                                              infoMap?['storyTxt']?.toString();
                                           final storyDesc =
                                               (infoMap?['storyDesc'] ?? '')
                                                   .toString()
                                                   .trim();
+                                          final bool hasStoryTxt =
+                                              storyTxt != null &&
+                                                  storyTxt.isNotEmpty;
 
-                                          return Container(
-                                            margin: const EdgeInsets.only(
-                                              bottom: 8,
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 10,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(
-                                                0.5,
+                                          return GestureDetector(
+                                            onTap: hasStoryTxt
+                                                ? () => _openStory(storyTxt!)
+                                                : null,
+                                            behavior: HitTestBehavior.opaque,
+                                            child: Container(
+                                              margin: const EdgeInsets.only(
+                                                bottom: 8,
                                               ),
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              border: Border.all(
-                                                color: Colors.white.withOpacity(
-                                                  0.12,
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 10,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(
+                                                  0.5,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                border: Border.all(
+                                                  color: Colors.white.withOpacity(
+                                                    0.12,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            storyName,
-                                                            style: TextStyle(
-                                                              color:
-                                                                  primaryText,
-                                                              fontSize:
-                                                                  titleSize,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                            ),
-                                                          ),
-                                                          if (storyCode != null)
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
                                                             Text(
-                                                              storyCode,
+                                                              storyName,
                                                               style: TextStyle(
                                                                 color:
-                                                                    secondaryText,
+                                                                    primaryText,
                                                                 fontSize:
-                                                                    codeSize,
+                                                                    titleSize,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
                                                               ),
                                                             ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    if (tag != null)
-                                                      Container(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              horizontal: 8,
-                                                              vertical: 4,
-                                                            ),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.white
-                                                              .withOpacity(0.1),
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                8,
+                                                            if (storyCode != null)
+                                                              Text(
+                                                                storyCode,
+                                                                style: TextStyle(
+                                                                  color:
+                                                                      secondaryText,
+                                                                  fontSize:
+                                                                      codeSize,
+                                                                ),
                                                               ),
+                                                          ],
                                                         ),
-                                                        child: Text(
-                                                          tag,
-                                                          style: TextStyle(
-                                                            color:
-                                                                secondaryText,
-                                                            fontSize: codeSize,
+                                                      ),
+                                                      if (tag != null)
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 4,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white
+                                                                .withOpacity(0.1),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            tag,
+                                                            style: TextStyle(
+                                                              color:
+                                                                  secondaryText,
+                                                              fontSize: codeSize,
+                                                            ),
                                                           ),
                                                         ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                if (storyDesc.isNotEmpty) ...[
-                                                  const SizedBox(height: 8),
-                                                  Text(
-                                                    storyDesc,
-                                                    style: TextStyle(
-                                                      color: secondaryText,
-                                                      fontSize: descSize,
-                                                      height: 1.4,
-                                                    ),
+                                                    ],
                                                   ),
+                                                  if (storyDesc.isNotEmpty) ...[
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      storyDesc,
+                                                      style: TextStyle(
+                                                        color: secondaryText,
+                                                        fontSize: descSize,
+                                                        height: 1.4,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ],
-                                              ],
+                                              ),
                                             ),
                                           );
                                         }),

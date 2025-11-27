@@ -7,10 +7,17 @@ class StoryDashboard extends StatelessWidget {
   final Future<dynamic> storyMetaTableFuture;
   const StoryDashboard({super.key, required this.storyMetaTableFuture});
 
-  void onEntryTap(BuildContext context, String id) {
+  void onEntryTap(BuildContext context, String id, String? titleImageId) {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => StoryReviewPage(storyId: id)));
+    ).push(
+      MaterialPageRoute(
+        builder: (_) => StoryReviewPage(
+          storyId: id,
+          titleImageId: titleImageId,
+        ),
+      ),
+    );
   }
 
   @override
@@ -87,7 +94,11 @@ class StoryDashboard extends StatelessWidget {
                               width: cardWidth,
                               height: cardHeight,
                               onTap: () {
-                                onEntryTap(context, id.toString());
+                                onEntryTap(
+                                  context,
+                                  id.toString(),
+                                  table[id]['titleImageId']?.toString(),
+                                );
                               },
                             ),
                         ],
