@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../config/database.dart';
 import '../utils/audio_manager.dart';
 import '../utils/data_retriever.dart';
+import 'story.dart';
 
 class StoryReviewPage extends StatefulWidget {
   final String storyId;
@@ -44,6 +45,14 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   void initState() {
     super.initState();
     _loadStory();
+  }
+
+  void _openStory(String storyTxt) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StoryPage(storyTxt: storyTxt),
+      ),
+    );
   }
 
   Future<void> _loadStory() async {
@@ -356,108 +365,119 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                               infoMap?['avgTag'] as String?;
                                           final storyCode =
                                               infoMap?['storyCode'] as String?;
+                                          final storyTxt =
+                                              infoMap?['storyTxt']?.toString();
                                           final storyDesc =
                                               (infoMap?['storyDesc'] ?? '')
                                                   .toString()
                                                   .trim();
+                                          final bool hasStoryTxt =
+                                              storyTxt != null &&
+                                                  storyTxt.isNotEmpty;
 
-                                          return Container(
-                                            margin: const EdgeInsets.only(
-                                              bottom: 8,
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 10,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(
-                                                0.5,
+                                          return GestureDetector(
+                                            onTap: hasStoryTxt
+                                                ? () => _openStory(storyTxt!)
+                                                : null,
+                                            behavior: HitTestBehavior.opaque,
+                                            child: Container(
+                                              margin: const EdgeInsets.only(
+                                                bottom: 8,
                                               ),
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              border: Border.all(
-                                                color: Colors.white.withOpacity(
-                                                  0.12,
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 10,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(
+                                                  0.5,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                border: Border.all(
+                                                  color: Colors.white.withOpacity(
+                                                    0.12,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            storyName,
-                                                            style: TextStyle(
-                                                              color:
-                                                                  primaryText,
-                                                              fontSize:
-                                                                  titleSize,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                            ),
-                                                          ),
-                                                          if (storyCode != null)
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
                                                             Text(
-                                                              storyCode,
+                                                              storyName,
                                                               style: TextStyle(
                                                                 color:
-                                                                    secondaryText,
+                                                                    primaryText,
                                                                 fontSize:
-                                                                    codeSize,
+                                                                    titleSize,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
                                                               ),
                                                             ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    if (tag != null)
-                                                      Container(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              horizontal: 8,
-                                                              vertical: 4,
-                                                            ),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.white
-                                                              .withOpacity(0.1),
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                8,
+                                                            if (storyCode != null)
+                                                              Text(
+                                                                storyCode,
+                                                                style: TextStyle(
+                                                                  color:
+                                                                      secondaryText,
+                                                                  fontSize:
+                                                                      codeSize,
+                                                                ),
                                                               ),
+                                                          ],
                                                         ),
-                                                        child: Text(
-                                                          tag,
-                                                          style: TextStyle(
-                                                            color:
-                                                                secondaryText,
-                                                            fontSize: codeSize,
+                                                      ),
+                                                      if (tag != null)
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 4,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white
+                                                                .withOpacity(0.1),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            tag,
+                                                            style: TextStyle(
+                                                              color:
+                                                                  secondaryText,
+                                                              fontSize: codeSize,
+                                                            ),
                                                           ),
                                                         ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                if (storyDesc.isNotEmpty) ...[
-                                                  const SizedBox(height: 8),
-                                                  Text(
-                                                    storyDesc,
-                                                    style: TextStyle(
-                                                      color: secondaryText,
-                                                      fontSize: descSize,
-                                                      height: 1.4,
-                                                    ),
+                                                    ],
                                                   ),
+                                                  if (storyDesc.isNotEmpty) ...[
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      storyDesc,
+                                                      style: TextStyle(
+                                                        color: secondaryText,
+                                                        fontSize: descSize,
+                                                        height: 1.4,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ],
-                                              ],
+                                              ),
                                             ),
                                           );
                                         }),
