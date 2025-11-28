@@ -22,7 +22,16 @@ class Database {
   // path to story data
   static String storyDataURLCN = "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master";
   static String storyDataURLGlobal = "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData_YoStar/main";
-  static String storyContentPath = Config.server == "zh_CN" ? "$storyDataURLCN/${Config.server}/gamedata/story/" : "$storyDataURLGlobal/${Config.server}/gamedata/excel/story/";
+  static String storyContentURL = "https://raw.githubusercontent.com/KakkoiiSaber/arknights_story_data/main";
+  static String storyContentPath ="$storyContentURL/assets/${Config.server}/story/";
+
+  // path to story assets
+  static const storyAssetsURL = "https://raw.githubusercontent.com/akgcc/arkdata/main";
+  static String storyBackgroundPath = "$storyAssetsURL/assets/torappu/dynamicassets/avg/backgrounds/";
+  static String storyImagePath = "$storyAssetsURL/assets/torappu/dynamicassets/avg/images/";
+  static String storyMusicPath = "$storyAssetsURL/assets/torappu/dynamicassets/";
+  static String storySoundPath = "$storyAssetsURL/assets/torappu/dynamicassets/";
+  static String characterPath = "$storyAssetsURL/assets/avg/characters/";
 
 
 }
