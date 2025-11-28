@@ -46,6 +46,16 @@ jobs:
             build: flutter build linux --release
             artifact: build/linux/**/release/bundle
 
+          - name: macos
+            os: macos-latest
+            build: flutter build macos --release
+            artifact: build/macos/Build/Products/Release
+
+          - name: ios
+            os: macos-latest
+            build: flutter build ios --release --no-codesign
+            artifact: build/ios/iphoneos
+
           - name: windows
             os: windows-latest
             build: flutter build windows --release
