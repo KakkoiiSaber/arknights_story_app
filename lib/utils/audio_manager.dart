@@ -57,6 +57,12 @@ class AudioManager {
     await _loop.stop();
   }
 
+  Future<void> setVolume(double volume) async {
+    final clamped = volume.clamp(0.0, 1.0);
+    await _intro.setVolume(clamped);
+    await _loop.setVolume(clamped);
+  }
+
   Future<void> dispose() async {
     await _intro.dispose();
     await _loop.dispose();
