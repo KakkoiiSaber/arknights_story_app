@@ -92,7 +92,7 @@ jobs:
         run: flutter build macos --release
       - name: Create DMG
         run: |
-          APP_PATH="build/macos/Build/Products/Release/arknights_story_app.app"
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -type d -name '*.app' | head -n1)"
           DMG_NAME="arknights_story_app-macos.dmg"
           hdiutil create "$DMG_NAME" -volname "ArknightsStoryApp" -fs HFS+ -srcfolder "$APP_PATH"
         shell: bash
@@ -112,15 +112,24 @@ jobs:
           cache: true
       - name: Install deps
         run: flutter pub get
-      - name: Build unsigned IPA
+      - name: Build iOS app (unsigned)
         run: |
-          flutter build ipa --release --no-codesign
+          flutter build ios --release --no-codesign
+      - name: Create IPA
+        run: |
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          PAYLOAD_DIR="Payload"
+          IPA_NAME="arknights_story_app-ios.ipa"
+          rm -rf "$PAYLOAD_DIR"
+          mkdir -p "$PAYLOAD_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
+          zip -qr "$IPA_NAME" "$PAYLOAD_DIR"
         shell: bash
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: ios
-          path: build/ios/ipa/*.ipa
+          path: arknights_story_app-ios.ipa
 
   build-windows:
     runs-on: windows-latest
@@ -137,9 +146,10 @@ jobs:
         run: flutter build windows --release
         shell: bash
       - name: Package zip (unsigned)
+        shell: pwsh
         run: |
-          cd build/windows/x64/runner/Release
-          powershell -Command "Compress-Archive * ../../../arknights_story_app-windows.zip"
+          Set-Location build/windows/x64/runner/Release
+          Compress-Archive -Path * -DestinationPath ../arknights_story_app-windows.zip -Force
       - name: Upload Windows zip
         uses: actions/upload-artifact@v4
         with:
