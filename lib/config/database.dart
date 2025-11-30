@@ -27,11 +27,11 @@ class Database {
 
   // path to story assets
   static const storyAssetsURL = "https://raw.githubusercontent.com/akgcc/arkdata/main";
-  static String storyBackgroundPath = "$storyAssetsURL/assets/torappu/dynamicassets/avg/backgrounds/";
-  static String storyImagePath = "$storyAssetsURL/assets/torappu/dynamicassets/avg/images/";
+  static String storyBackgroundPath = "$storyAssetsURL/assets/torappu/dynamicassets/avg/backgrounds";
+  static String storyImagePath = "$storyAssetsURL/assets/torappu/dynamicassets/avg/images";
   static String storyMusicPath = "$storyAssetsURL/assets/torappu/dynamicassets/";
   static String storySoundPath = "$storyAssetsURL/assets/torappu/dynamicassets/";
-  static String characterPath = "$storyAssetsURL/assets/avg/characters/";
+  static String storyCharacterPath = "$storyAssetsURL/assets/avg/characters";
 
 
 }

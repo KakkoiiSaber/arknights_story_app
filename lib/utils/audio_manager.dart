@@ -25,6 +25,25 @@ class AudioManager {
     await _resumeSafely(_loop);
   }
 
+  Future<void> playSound(String? url, {double? volume}) async {
+    if (url == null || url.isEmpty) return;
+    final player = AudioPlayer();
+    await player.setReleaseMode(ReleaseMode.stop);
+    if (volume != null) {
+      await player.setVolume(volume.clamp(0.0, 1.0));
+    }
+    try {
+      await player.play(UrlSource(url));
+    } catch (e, st) {
+      log('Audio playSound failed for $url: $e',
+          stackTrace: st, name: 'AudioManager');
+    } finally {
+      player.onPlayerComplete.first.then((_) => player.dispose()).catchError(
+        (_) {},
+      );
+    }
+  }
+
   Future<void> intro2loop(String? introURL, String? loopURL) async {
     final introReady = await _setSourceSafely(_intro, introURL);
     final loopReady = await _setSourceSafely(_loop, loopURL);
