@@ -53,10 +53,20 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     await audio.stop();
   }
 
-  void _openStory(String storyTxt) {
+  void _openStory({
+    required String storyTxt,
+    String? storyName,
+    String? storyCode,
+    String? storyTag,
+  }) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => StoryPage(storyTxtPath: storyTxt),
+        builder: (_) => StoryPage(
+          storyTxtPath: storyTxt,
+          storyName: storyName,
+          storyCode: storyCode,
+          storyTag: storyTag,
+        ),
       ),
     );
   }
@@ -379,7 +389,12 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
                                           return GestureDetector(
                                             onTap: hasStoryTxt
-                                                ? () => _openStory(storyTxt!)
+                                                ? () => _openStory(
+                                                      storyTxt: storyTxt!,
+                                                      storyName: storyName,
+                                                      storyCode: storyCode,
+                                                      storyTag: tag,
+                                                    )
                                                 : null,
                                             behavior: HitTestBehavior.opaque,
                                             child: Container(

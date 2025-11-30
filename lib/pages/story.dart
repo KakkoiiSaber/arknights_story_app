@@ -6,9 +6,18 @@ import '../utils/audio_manager.dart';
 import '../utils/data_retriever.dart';
 
 class StoryPage extends StatefulWidget {
-  const StoryPage({super.key, required this.storyTxtPath});
+  const StoryPage({
+    super.key,
+    required this.storyTxtPath,
+    this.storyName,
+    this.storyCode,
+    this.storyTag,
+  });
 
   final String storyTxtPath;
+  final String? storyName;
+  final String? storyCode;
+  final String? storyTag;
 
   @override
   State<StoryPage> createState() => _StoryPageState();
@@ -47,7 +56,48 @@ class _StoryPageState extends State<StoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Story'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.storyName ?? 'Story',
+              overflow: TextOverflow.ellipsis,
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.storyCode != null && widget.storyCode!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      widget.storyCode!,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: Colors.white70),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                if (widget.storyTag != null && widget.storyTag!.isNotEmpty)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      widget.storyTag!,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
         actions: [
           ValueListenableBuilder<bool>(
             valueListenable: audio.soundEnabled,
