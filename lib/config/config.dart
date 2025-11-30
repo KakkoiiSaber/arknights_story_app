@@ -1,5 +1,5 @@
 class Config {
-  static bool isSoundEnabled = true;
+  static bool isSoundEnabled = false;
   static List<String> serverList = ["zh_CN", "en_US", "ja_JP", "ko_KR"];
   static String server = "zh_CN";
   static double layoutSwitchSize = 1080;

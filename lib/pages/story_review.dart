@@ -53,10 +53,20 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     await audio.stop();
   }
 
-  void _openStory(String storyTxt) {
+  void _openStory({
+    required String storyTxt,
+    String? storyName,
+    String? storyCode,
+    String? storyTag,
+  }) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => StoryPage(storyTxtPath: storyTxt),
+        builder: (_) => StoryPage(
+          storyTxtPath: storyTxt,
+          storyName: storyName,
+          storyCode: storyCode,
+          storyTag: storyTag,
+        ),
       ),
     );
   }
@@ -253,10 +263,6 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         (_titleReady || !hasTitle);
 
     return Scaffold(
-      // appBar: AppBar(
-      //   // title: Text(name ?? 'Story')
-      //   // backgroundColor: Colors.transparent,
-      //   ),
       body: Stack(
         children: [
           if (showBackgroundLayer)
@@ -383,7 +389,12 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
                                           return GestureDetector(
                                             onTap: hasStoryTxt
-                                                ? () => _openStory(storyTxt!)
+                                                ? () => _openStory(
+                                                      storyTxt: storyTxt!,
+                                                      storyName: storyName,
+                                                      storyCode: storyCode,
+                                                      storyTag: tag,
+                                                    )
                                                 : null,
                                             behavior: HitTestBehavior.opaque,
                                             child: Container(
@@ -510,7 +521,39 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
               ),
             ),
           _buildBackButton(),
+          _buildVolumeButton(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVolumeButton() {
+    return Positioned(
+      top: 12,
+      right: 12,
+      child: SafeArea(
+        child: ValueListenableBuilder<bool>(
+          valueListenable: audio.soundEnabled,
+          builder: (context, enabled, _) {
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: IconButton(
+                icon: Icon(
+                  enabled ? Icons.volume_up : Icons.volume_off,
+                  color: Colors.white,
+                ),
+                onPressed: () async {
+                  await audio.toggleEnabled();
+                  if (mounted) setState(() {});
+                },
+                tooltip: enabled ? 'Mute' : 'Unmute',
+              ),
+            );
+          },
+        ),
       ),
     );
   }

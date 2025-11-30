@@ -6,9 +6,18 @@ import '../utils/audio_manager.dart';
 import '../utils/data_retriever.dart';
 
 class StoryPage extends StatefulWidget {
-  const StoryPage({super.key, required this.storyTxtPath});
+  const StoryPage({
+    super.key,
+    required this.storyTxtPath,
+    this.storyName,
+    this.storyCode,
+    this.storyTag,
+  });
 
   final String storyTxtPath;
+  final String? storyName;
+  final String? storyCode;
+  final String? storyTag;
 
   @override
   State<StoryPage> createState() => _StoryPageState();
@@ -16,7 +25,6 @@ class StoryPage extends StatefulWidget {
 
 class _StoryPageState extends State<StoryPage> {
   late Future<List<Map<String, dynamic>>> _storyFuture;
-  String? _currentSpeaker;
 
   @override
   void initState() {
@@ -48,7 +56,63 @@ class _StoryPageState extends State<StoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Story'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.storyName ?? 'Story',
+              overflow: TextOverflow.ellipsis,
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.storyCode != null && widget.storyCode!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      widget.storyCode!,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: Colors.white70),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                if (widget.storyTag != null && widget.storyTag!.isNotEmpty)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      widget.storyTag!,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          ValueListenableBuilder<bool>(
+            valueListenable: audio.soundEnabled,
+            builder: (context, enabled, _) {
+              return IconButton(
+                icon: Icon(enabled ? Icons.volume_up : Icons.volume_off),
+                tooltip: enabled ? 'Mute' : 'Unmute',
+                onPressed: () async {
+                  await audio.toggleEnabled();
+                  setState(() {});
+                },
+              );
+            },
+          ),
+        ],
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _storyFuture,
@@ -73,6 +137,8 @@ class _StoryPageState extends State<StoryPage> {
             return const Center(child: Text('No story content available.'));
           }
 
+          String? lastSpeaker;
+
           return Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
@@ -81,7 +147,10 @@ class _StoryPageState extends State<StoryPage> {
                 padding: const EdgeInsets.all(16),
                 itemCount: events.length,
                 separatorBuilder: (context, _) => const SizedBox(height: 0),
-                itemBuilder: (context, index) => _buildEvent(events[index]),
+                itemBuilder: (context, index) =>
+                    _buildEvent(events[index], () => lastSpeaker, (v) {
+                  lastSpeaker = v;
+                }),
               ),
             ),
           );
@@ -90,10 +159,14 @@ class _StoryPageState extends State<StoryPage> {
   );
 }
 
-  Widget _buildEvent(Map<String, dynamic> event) {
+  Widget _buildEvent(
+    Map<String, dynamic> event,
+    String? Function() getLastSpeaker,
+    void Function(String?) setLastSpeaker,
+  ) {
     final type = (event['type'] ?? '').toString();
     if (type == "decision"){
-      event['speaker'] = "Dr. {@nickname}";
+      event['speaker'] = "Dr. {@name}";
     }
     switch (type) {
       case 'background':
@@ -118,21 +191,24 @@ class _StoryPageState extends State<StoryPage> {
       case 'narration':
       // case 'subtitle':
         final nextSpeaker = (event['speaker'] ?? '').toString();
-        String? displaySpeaker;
-        if (nextSpeaker.isNotEmpty && nextSpeaker != _currentSpeaker) {
-          _currentSpeaker = nextSpeaker;
-          displaySpeaker = nextSpeaker;
+        final showSpeaker =
+            nextSpeaker.isNotEmpty && nextSpeaker != getLastSpeaker();
+        if (showSpeaker) {
+          setLastSpeaker(nextSpeaker);
         }
         return dialogueContainer(
-          speaker: displaySpeaker ?? '',
+          speaker: showSpeaker ? nextSpeaker : '',
           content: (event['content'] ?? '').toString(),
         );
       case 'decision':
         final nextSpeaker = (event['speaker'] ?? '').toString();
-        if (nextSpeaker.isNotEmpty && nextSpeaker != _currentSpeaker) {
-          _currentSpeaker = nextSpeaker;
+        final showSpeaker =
+            nextSpeaker.isNotEmpty && nextSpeaker != getLastSpeaker();
+        if (showSpeaker) {
+          setLastSpeaker(nextSpeaker);
         }
         return decisionContainer(
+          speaker: (event['speaker'] ?? '').toString(),
           options: event['options']?.toString() ?? '',
           onOptionSelected: (idx) {
             // Handle decision selection here.
@@ -180,7 +256,7 @@ class _StoryPageState extends State<StoryPage> {
     final key = event['key']?.toString();
     final volume = double.tryParse(event['volume']?.toString() ?? '');
     if (key == null) return;
-    audio.playSound('${Database.storyMusicPath}$key', volume: volume);
+    audio.playSoundSingle('${Database.storyMusicPath}$key', volume: volume);
   }
 }
 
