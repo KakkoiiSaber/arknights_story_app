@@ -7,83 +7,169 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: android-apk
-            os: ubuntu-latest
-            build: flutter build apk --release
-            artifact: build/app/outputs/flutter-apk/app-release.apk
-
-          - name: android-aab
-            os: ubuntu-latest
-            build: flutter build appbundle --release
-            artifact: build/app/outputs/bundle/release/app-release.aab
-
-          - name: web
-            os: ubuntu-latest
-            build: flutter build web --release
-            artifact: build/web
-
-          - name: linux
-            os: ubuntu-latest
-            setup: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
-            build: flutter build linux --release
-            artifact: build/linux/**/release/bundle
-
-          - name: macos
-            os: macos-latest
-            build: flutter build macos --release
-            artifact: build/macos/Build/Products/Release
-
-          - name: ios
-            os: macos-latest
-            build: flutter build ios --release --no-codesign
-            artifact: build/ios/iphoneos
-
-          - name: windows
-            os: windows-latest
-            build: flutter build windows --release
-            artifact: build/windows/**/runner/Release
-
-    runs-on: ${{ matrix.os }}
-
+  build-android:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
           channel: "stable"
           cache: true
-
-      - name: Install dependencies
+      - name: Install deps
         run: flutter pub get
-
-      - name: Platform setup
-        if: ${{ matrix.setup != '' }}
-        shell: bash
-        run: ${{ matrix.setup }}
-
-      - name: Build
-        shell: bash
-        run: ${{ matrix.build }}
-
-      - name: Upload artifact
+      - name: Build APK (per abi)
+        run: flutter build apk --release --split-per-abi
+      - name: Build AAB
+        run: flutter build appbundle --release
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}
-          path: ${{ matrix.artifact }}
+          name: android-apk
+          path: build/app/outputs/flutter-apk/*.apk
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+      - name: Install deps
+        run: flutter pub get
+      - name: Build web
+        run: flutter build web --release
+      - name: Upload web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: build/web
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-tools gstreamer1.0-x
+          flutter pub get
+      - name: Build Linux (bundle)
+        run: flutter build linux --release
+      - name: Package tar.gz
+        run: |
+          cd build/linux/x64/release
+          tar -zcvf linux-bundle.tar.gz bundle
+      - name: Upload Linux package
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: build/linux/x64/release/linux-bundle.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+      - name: Install deps
+        run: flutter pub get
+      - name: Build macOS app
+        run: flutter build macos --release
+      - name: Create DMG
+        run: |
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -type d -name '*.app' | head -n1)"
+          DMG_NAME="arknights_story_app-macos.dmg"
+          hdiutil create "$DMG_NAME" -volname "ArknightsStoryApp" -fs HFS+ -srcfolder "$APP_PATH"
+        shell: bash
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: arknights_story_app-macos.dmg
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+      - name: Install deps
+        run: flutter pub get
+      - name: Build iOS app (unsigned)
+        run: |
+          flutter build ios --release --no-codesign
+      - name: Create IPA
+        run: |
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          PAYLOAD_DIR="Payload"
+          IPA_NAME="arknights_story_app-ios.ipa"
+          rm -rf "$PAYLOAD_DIR"
+          mkdir -p "$PAYLOAD_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
+          zip -qr "$IPA_NAME" "$PAYLOAD_DIR"
+        shell: bash
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: arknights_story_app-ios.ipa
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+      - name: Install deps
+        run: flutter pub get
+        shell: bash
+      - name: Build Windows
+        run: flutter build windows --release
+        shell: bash
+      - name: Package zip (unsigned)
+        shell: pwsh
+        run: |
+          Set-Location build/windows/x64/runner/Release
+          Compress-Archive -Path * -DestinationPath ../arknights_story_app-windows.zip -Force
+      - name: Upload Windows zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: build/windows/x64/runner/arknights_story_app-windows.zip
 
   release:
-    needs: build
+    needs:
+      - build-android
+      - build-web
+      - build-linux
+      - build-macos
+      - build-ios
+      - build-windows
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
