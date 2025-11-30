@@ -44,13 +44,18 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   @override
   void initState() {
     super.initState();
+    _stopAllAudio();
     _loadStory();
+  }
+
+  Future<void> _stopAllAudio() async {
+    await audio.stop();
   }
 
   void _openStory(String storyTxt) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => StoryPage(storyTxt: storyTxt),
+        builder: (_) => StoryPage(storyTxtPath: storyTxt),
       ),
     );
   }

@@ -28,7 +28,9 @@ String? _cleanString(dynamic value) {
   final trimmed = value.toString().trim();
   if (trimmed.isEmpty) return null;
   // Incoming data sometimes ends with a trailing comma.
-  return trimmed.endsWith(',') ? trimmed.substring(0, trimmed.length - 1) : trimmed;
+  return trimmed.endsWith(',')
+      ? trimmed.substring(0, trimmed.length - 1)
+      : trimmed;
 }
 
 List<String> _splitOptions(dynamic value) {
