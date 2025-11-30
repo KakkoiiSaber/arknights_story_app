@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../config/config.dart';
 import '../config/database.dart';
 import '../story/event_builder.dart';
 import '../utils/audio_manager.dart';
@@ -73,12 +73,18 @@ class _StoryPageState extends State<StoryPage> {
             return const Center(child: Text('No story content available.'));
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: events.length,
-          separatorBuilder: (context, _) => const SizedBox(height: 0),
-          itemBuilder: (context, index) => _buildEvent(events[index]),
-        );
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: Config.layoutSwitchSize),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: events.length,
+                separatorBuilder: (context, _) => const SizedBox(height: 0),
+                itemBuilder: (context, index) => _buildEvent(events[index]),
+              ),
+            ),
+          );
       },
     ),
   );
@@ -123,10 +129,8 @@ class _StoryPageState extends State<StoryPage> {
         );
       case 'decision':
         final nextSpeaker = (event['speaker'] ?? '').toString();
-        String? displaySpeaker;
         if (nextSpeaker.isNotEmpty && nextSpeaker != _currentSpeaker) {
           _currentSpeaker = nextSpeaker;
-          displaySpeaker = nextSpeaker;
         }
         return decisionContainer(
           options: event['options']?.toString() ?? '',
