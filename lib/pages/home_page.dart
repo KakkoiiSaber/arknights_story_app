@@ -13,7 +13,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool _isPlayingHomeMusic = false;
   StoryTypeFilter _filter = StoryTypeFilter.all;
-  bool _muted = true;
   late final Future<dynamic> _storyMetaFuture;
 
   @override
@@ -88,8 +87,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-      // appBar: AppBar(title: const Text('Home')),
-      body: StoryDashboard(storyMetaTableFuture:  DataRetriever.getJsonFromURL(Database.storyMetaTablePath),),
       ),
       body: StoryDashboard(
         storyMetaTableFuture: _storyMetaFuture,
