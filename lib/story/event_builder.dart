@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../config/database.dart';
-import '../config/config.dart';
-
 
 Widget storyImageContainer({
   String? imagePath,
@@ -80,7 +78,7 @@ Widget dialogueContainer({
 }) {
   return Container(
     padding: const EdgeInsets.all(8.0),
-    color: Colors.black54,
+    color: const Color.fromARGB(0, 0, 0, 0),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,6 +106,7 @@ Widget dialogueContainer({
 
 Widget decisionContainer({
   required String options,
+  String speaker = 'Dr. {@nickname}',
   List<String>? optionsList,
   required void Function(int) onOptionSelected,
 }) {
@@ -115,7 +114,7 @@ Widget decisionContainer({
   return Container(
     padding: const EdgeInsets.all(8.0),
     decoration: BoxDecoration(
-      color: Colors.black54,
+      color: const Color.fromARGB(0, 0, 0, 0),
       borderRadius: BorderRadius.circular(0),
       // border: Border.all(color: Colors.white12),
     ),
@@ -124,11 +123,11 @@ Widget decisionContainer({
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
       Text(
-            "Dr. {@nickname}",
+            speaker,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
-              color: Colors.white,
+              color: Color.fromARGB(255, 168, 168, 168),
             ),
         ),
         SizedBox(height: 8),

@@ -16,7 +16,6 @@ class StoryPage extends StatefulWidget {
 
 class _StoryPageState extends State<StoryPage> {
   late Future<List<Map<String, dynamic>>> _storyFuture;
-  String? _currentSpeaker;
 
   @override
   void initState() {
@@ -49,6 +48,21 @@ class _StoryPageState extends State<StoryPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Story'),
+        actions: [
+          ValueListenableBuilder<bool>(
+            valueListenable: audio.soundEnabled,
+            builder: (context, enabled, _) {
+              return IconButton(
+                icon: Icon(enabled ? Icons.volume_up : Icons.volume_off),
+                tooltip: enabled ? 'Mute' : 'Unmute',
+                onPressed: () async {
+                  await audio.toggleEnabled();
+                  setState(() {});
+                },
+              );
+            },
+          ),
+        ],
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _storyFuture,
@@ -73,6 +87,8 @@ class _StoryPageState extends State<StoryPage> {
             return const Center(child: Text('No story content available.'));
           }
 
+          String? lastSpeaker;
+
           return Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
@@ -81,7 +97,10 @@ class _StoryPageState extends State<StoryPage> {
                 padding: const EdgeInsets.all(16),
                 itemCount: events.length,
                 separatorBuilder: (context, _) => const SizedBox(height: 0),
-                itemBuilder: (context, index) => _buildEvent(events[index]),
+                itemBuilder: (context, index) =>
+                    _buildEvent(events[index], () => lastSpeaker, (v) {
+                  lastSpeaker = v;
+                }),
               ),
             ),
           );
@@ -90,10 +109,14 @@ class _StoryPageState extends State<StoryPage> {
   );
 }
 
-  Widget _buildEvent(Map<String, dynamic> event) {
+  Widget _buildEvent(
+    Map<String, dynamic> event,
+    String? Function() getLastSpeaker,
+    void Function(String?) setLastSpeaker,
+  ) {
     final type = (event['type'] ?? '').toString();
     if (type == "decision"){
-      event['speaker'] = "Dr. {@nickname}";
+      event['speaker'] = "Dr. {@name}";
     }
     switch (type) {
       case 'background':
@@ -118,21 +141,24 @@ class _StoryPageState extends State<StoryPage> {
       case 'narration':
       // case 'subtitle':
         final nextSpeaker = (event['speaker'] ?? '').toString();
-        String? displaySpeaker;
-        if (nextSpeaker.isNotEmpty && nextSpeaker != _currentSpeaker) {
-          _currentSpeaker = nextSpeaker;
-          displaySpeaker = nextSpeaker;
+        final showSpeaker =
+            nextSpeaker.isNotEmpty && nextSpeaker != getLastSpeaker();
+        if (showSpeaker) {
+          setLastSpeaker(nextSpeaker);
         }
         return dialogueContainer(
-          speaker: displaySpeaker ?? '',
+          speaker: showSpeaker ? nextSpeaker : '',
           content: (event['content'] ?? '').toString(),
         );
       case 'decision':
         final nextSpeaker = (event['speaker'] ?? '').toString();
-        if (nextSpeaker.isNotEmpty && nextSpeaker != _currentSpeaker) {
-          _currentSpeaker = nextSpeaker;
+        final showSpeaker =
+            nextSpeaker.isNotEmpty && nextSpeaker != getLastSpeaker();
+        if (showSpeaker) {
+          setLastSpeaker(nextSpeaker);
         }
         return decisionContainer(
+          speaker: (event['speaker'] ?? '').toString(),
           options: event['options']?.toString() ?? '',
           onOptionSelected: (idx) {
             // Handle decision selection here.
@@ -180,7 +206,7 @@ class _StoryPageState extends State<StoryPage> {
     final key = event['key']?.toString();
     final volume = double.tryParse(event['volume']?.toString() ?? '');
     if (key == null) return;
-    audio.playSound('${Database.storyMusicPath}$key', volume: volume);
+    audio.playSoundSingle('${Database.storyMusicPath}$key', volume: volume);
   }
 }
 
