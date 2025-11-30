@@ -12,10 +12,15 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool _isPlayingHomeMusic = false;
+  StoryTypeFilter _filter = StoryTypeFilter.all;
+  bool _muted = true;
+  late final Future<dynamic> _storyMetaFuture;
 
   @override
   void initState() {
     super.initState();
+    _storyMetaFuture =
+        DataRetriever.getJsonFromURL(Database.storyMetaTablePath);
     _playHomeMusic(); // do not await here
   }
 
@@ -45,9 +50,51 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final filters = const [
+      StoryTypeFilter.all,
+      StoryTypeFilter.main,
+      StoryTypeFilter.activity,
+      StoryTypeFilter.mini,
+    ];
+    final labels = const ['All', 'Main', 'Activity', 'Mini'];
+    final selected =
+        filters.map((f) => f == _filter).toList(growable: false);
+
     return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Text('Home'),
+            const SizedBox(width: 12),
+            ToggleButtons(
+              isSelected: selected,
+              onPressed: (index) {
+                setState(() {
+                  _filter = filters[index];
+                });
+              },
+              borderRadius: BorderRadius.circular(10),
+              selectedColor: Colors.white,
+              fillColor: Colors.white24,
+              constraints:
+                  const BoxConstraints(minHeight: 32, minWidth: 70),
+              children: [
+                for (final label in labels)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(label),
+                  ),
+              ],
+            ),
+          ],
+        ),
       // appBar: AppBar(title: const Text('Home')),
       body: StoryDashboard(storyMetaTableFuture:  DataRetriever.getJsonFromURL(Database.storyMetaTablePath),),
+      ),
+      body: StoryDashboard(
+        storyMetaTableFuture: _storyMetaFuture,
+        filter: _filter,
+      ),
     );
   }
 }

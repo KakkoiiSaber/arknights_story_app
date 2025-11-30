@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../config/database.dart';
+import '../config/config.dart';
 import '../utils/audio_manager.dart';
 import '../utils/data_retriever.dart';
 import 'story.dart';
@@ -21,7 +22,7 @@ class StoryReviewPage extends StatefulWidget {
 }
 
 class _StoryReviewPageState extends State<StoryReviewPage> {
-  static const double _layoutSwitchSize = 1080;
+  static final double _layoutSwitchSize = Config.layoutSwitchSize;
 
   Map<String, dynamic>? _story;
   bool _loading = true;

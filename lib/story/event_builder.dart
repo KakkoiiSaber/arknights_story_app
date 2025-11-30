@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../config/database.dart';
+import '../config/config.dart';
 
 
 Widget storyImageContainer({

@@ -3,9 +3,16 @@ import 'package:flutter/material.dart';
 import 'story_entry.dart';
 import '../pages/story_review.dart';
 
+enum StoryTypeFilter { all, main, activity, mini }
+
 class StoryDashboard extends StatelessWidget {
   final Future<dynamic> storyMetaTableFuture;
-  const StoryDashboard({super.key, required this.storyMetaTableFuture});
+  final StoryTypeFilter filter;
+  const StoryDashboard({
+    super.key,
+    required this.storyMetaTableFuture,
+    this.filter = StoryTypeFilter.all,
+  });
 
   void onEntryTap(BuildContext context, String id, String? titleImageId) {
     Navigator.of(
@@ -32,7 +39,7 @@ class StoryDashboard extends StatelessWidget {
         if (table == null) {
           return const Center(child: Text('Failed to load stories'));
         }
-        final ids = table.keys.toList();
+        final ids = _filteredAndSortedIds(table, filter);
         return SingleChildScrollView(
           child: SizedBox(
             width: MediaQuery.of(context).size.width,
@@ -113,4 +120,57 @@ class StoryDashboard extends StatelessWidget {
       },
     );
   }
+}
+
+List<dynamic> _filteredAndSortedIds(
+  Map<dynamic, dynamic> table,
+  StoryTypeFilter filter,
+) {
+  final filtered = table.keys.where((id) {
+    final type = table[id]?['type']?.toString() ?? '';
+    switch (filter) {
+      case StoryTypeFilter.main:
+        return type == 'MAIN_STORY';
+      case StoryTypeFilter.activity:
+        return type == 'ACTIVITY_STORY';
+      case StoryTypeFilter.mini:
+        return type == 'MINI_STORY';
+      case StoryTypeFilter.all:
+        return true;
+    }
+  }).toList();
+
+  filtered.sort((a, b) {
+    int safeYear(dynamic v) {
+      final raw = v?.toString() ?? '';
+      if (raw.contains('-')) {
+        final parts = raw.split('-');
+        if (parts.isNotEmpty) {
+          return int.tryParse(parts[0]) ?? 0;
+        }
+      }
+      return int.tryParse(raw) ?? 0;
+    }
+
+    int safeMonth(dynamic v) {
+      final raw = v?.toString() ?? '';
+      if (raw.contains('-')) {
+        final parts = raw.split('-');
+        if (parts.length > 1) {
+          return int.tryParse(parts[1]) ?? 1;
+        }
+      }
+      return 1;
+    }
+
+    final ayyyy = safeYear(table[a]?['startTime']);
+    final amm = safeMonth(table[a]?['startTime']);
+    final byyyy = safeYear(table[b]?['startTime']);
+    final bmm = safeMonth(table[b]?['startTime']);
+    final aTime = DateTime(ayyyy, amm);
+    final bTime = DateTime(byyyy, bmm);
+    return bTime.compareTo(aTime); // newest first
+  });
+
+  return filtered;
 }
