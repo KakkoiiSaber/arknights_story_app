@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build-android:
@@ -45,7 +47,7 @@ jobs:
           cache: true
       - name: Install deps
         run: flutter pub get
-      - name: Build web
+      - name: Build web (artifact)
         run: flutter build web --release
       - name: Zip web bundle
         run: |
@@ -120,8 +122,7 @@ jobs:
       - name: Install deps
         run: flutter pub get
       - name: Build iOS app (unsigned)
-        run: |
-          flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign
       - name: Create IPA
         run: |
           APP_PATH="build/ios/iphoneos/Runner.app"
@@ -162,6 +163,37 @@ jobs:
         with:
           name: windows
           path: build/windows/x64/runner/arknights_story_app-windows.zip
+
+  deploy-web-pages:
+    needs: build-web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+      - name: Install deps
+        run: flutter pub get
+      - name: Build Flutter Web (GitHub Pages)
+        run: flutter build web --release --base-href /arknights_story_app/
+      - name: Add .nojekyll
+        run: touch build/web/.nojekyll
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy-pages:
+    needs: deploy-web-pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
   release:
     needs:
