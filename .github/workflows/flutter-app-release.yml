@@ -20,15 +20,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build apk --release --split-per-abi
-      # - run: flutter build appbundle --release
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: android-apk
-      #     path: build/app/outputs/flutter-apk/*.apk
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: android-aab
-      #     path: build/app/outputs/bundle/release/app-release.aab
+
       - name: Organize Android Files
         run: |
           mkdir -p release
@@ -55,18 +47,12 @@ jobs:
             gstreamer1.0-plugins-base gstreamer1.0-tools gstreamer1.0-x
           flutter pub get
       - run: flutter build linux --release
-      - run: |
-          cd build/linux/x64/release
-          tar -zcvf linux-bundle.tar.gz bundle
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: linux
-      #     path: build/linux/x64/release/linux-bundle.tar.gz
+
       - name: Organize Linux Files
         run: |
           mkdir -p release
-          cd build/linux/x64/release
-          tar -zcvf ../../../release/arknights_story_linux.tar.gz bundle
+          tar -zcvf "$GITHUB_WORKSPACE/release/arknights_story_linux.tar.gz" \
+            -C build/linux/x64/release bundle
 
   build-macos:
     runs-on: macos-latest
@@ -78,21 +64,12 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build macos --release
-      - run: |
-          APP_PATH="$(find build/macos/Build/Products/Release -name '*.app' | head -n1)"
-          hdiutil create arknights_story_app-macos.dmg \
-            -volname "ArknightsStoryApp" \
-            -fs HFS+ \
-            -srcfolder "$APP_PATH"
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: macos
-      #     path: arknights_story_app-macos.dmg
+
       - name: Organize macOS Files
         run: |
           mkdir -p release
           APP_PATH="$(find build/macos/Build/Products/Release -name '*.app' | head -n1)"
-          hdiutil create release/arknights_story_macos.dmg \
+          hdiutil create "$GITHUB_WORKSPACE/release/arknights_story_macos.dmg" \
             -volname "ArknightsStory" \
             -fs HFS+ \
             -srcfolder "$APP_PATH"
@@ -107,21 +84,14 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build ios --release --no-codesign
-      - run: |
-          mkdir Payload
-          cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -qr arknights_story_app-ios.ipa Payload
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: ios
-      #     path: arknights_story_app-ios.ipa
+
       - name: Organize iOS Files
         run: |
           mkdir -p release
+          rm -rf Payload
           mkdir Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -qr release/arknights_story_ios.ipa Payload
-
+          zip -qr "$GITHUB_WORKSPACE/release/arknights_story_ios.ipa" Payload
 
   build-windows:
     runs-on: windows-latest
@@ -135,20 +105,15 @@ jobs:
         run: flutter pub get
       - shell: bash
         run: flutter build windows --release
-      - shell: pwsh
-        run: |
-          cd build/windows/x64/runner/Release
-          Compress-Archive -Path * -DestinationPath ../arknights_story_app-windows.zip
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: windows
-      #     path: build/windows/x64/runner/arknights_story_app-windows.zip
+
       - name: Organize Windows Files
         shell: pwsh
         run: |
-          mkdir release
-          Set-Location build/windows/x64/runner/Release
-          Compress-Archive -Path * -DestinationPath ../../../release/arknights_story_windows.zip -Force
+          New-Item -ItemType Directory -Force release | Out-Null
+          Compress-Archive `
+            -Path build/windows/x64/runner/Release/* `
+            -DestinationPath release/arknights_story_windows.zip `
+            -Force
 
   release:
     needs:
@@ -161,7 +126,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
-  
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
