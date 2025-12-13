@@ -1,4 +1,4 @@
-name: Flutter Release
+name: Flutter App Release
 
 on:
   push:
@@ -20,15 +20,24 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build apk --release --split-per-abi
-      - run: flutter build appbundle --release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/*.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+      # - run: flutter build appbundle --release
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: android-apk
+      #     path: build/app/outputs/flutter-apk/*.apk
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: android-aab
+      #     path: build/app/outputs/bundle/release/app-release.aab
+      - name: Organize Android Files
+        run: |
+          mkdir -p release
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+             release/arknights_story_android_arm64.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+             release/arknights_story_android_armeabi.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk \
+             release/arknights_story_android_x86_64.apk
 
   build-linux:
     runs-on: ubuntu-latest
@@ -49,10 +58,15 @@ jobs:
       - run: |
           cd build/linux/x64/release
           tar -zcvf linux-bundle.tar.gz bundle
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux
-          path: build/linux/x64/release/linux-bundle.tar.gz
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: linux
+      #     path: build/linux/x64/release/linux-bundle.tar.gz
+      - name: Organize Linux Files
+        run: |
+          mkdir -p release
+          cd build/linux/x64/release
+          tar -zcvf ../../../release/arknights_story_linux.tar.gz bundle
 
   build-macos:
     runs-on: macos-latest
@@ -70,10 +84,18 @@ jobs:
             -volname "ArknightsStoryApp" \
             -fs HFS+ \
             -srcfolder "$APP_PATH"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos
-          path: arknights_story_app-macos.dmg
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: macos
+      #     path: arknights_story_app-macos.dmg
+      - name: Organize macOS Files
+        run: |
+          mkdir -p release
+          APP_PATH="$(find build/macos/Build/Products/Release -name '*.app' | head -n1)"
+          hdiutil create release/arknights_story_macos.dmg \
+            -volname "ArknightsStory" \
+            -fs HFS+ \
+            -srcfolder "$APP_PATH"
 
   build-ios:
     runs-on: macos-latest
@@ -89,10 +111,17 @@ jobs:
           mkdir Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
           zip -qr arknights_story_app-ios.ipa Payload
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios
-          path: arknights_story_app-ios.ipa
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ios
+      #     path: arknights_story_app-ios.ipa
+      - name: Organize iOS Files
+        run: |
+          mkdir -p release
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr release/arknights_story_ios.ipa Payload
+
 
   build-windows:
     runs-on: windows-latest
@@ -110,27 +139,32 @@ jobs:
         run: |
           cd build/windows/x64/runner/Release
           Compress-Archive -Path * -DestinationPath ../arknights_story_app-windows.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: build/windows/x64/runner/arknights_story_app-windows.zip
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: windows
+      #     path: build/windows/x64/runner/arknights_story_app-windows.zip
+      - name: Organize Windows Files
+        shell: pwsh
+        run: |
+          mkdir release
+          Set-Location build/windows/x64/runner/Release
+          Compress-Archive -Path * -DestinationPath ../../../release/arknights_story_windows.zip -Force
 
-  release:
-    needs:
-      - build-android
-      - build-linux
-      - build-macos
-      - build-ios
-      - build-windows
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-      - uses: softprops/action-gh-release@v1
-        with:
-          files: dist/**/*
-          fail_on_unmatched_files: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+release:
+  needs:
+    - build-android
+    - build-linux
+    - build-macos
+    - build-ios
+    - build-windows
+  runs-on: ubuntu-latest
+  if: startsWith(github.ref, 'refs/tags/')
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
