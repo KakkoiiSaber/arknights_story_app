@@ -1,0 +1,44 @@
+name: Deploy Flutter Web to GitHub Pages
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-web-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Install deps
+        run: flutter pub get
+
+      - name: Build Flutter Web
+        run: flutter build web --release --base-href /arknights_story_app/
+
+      - name: Update docs folder
+        run: |
+          rm -rf docs
+          mv build/web docs
+          touch docs/.nojekyll
+
+      - name: Commit & push web build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs
+          git commit -m "chore(web): update Flutter web build" || echo "No changes"
+          git push origin main
