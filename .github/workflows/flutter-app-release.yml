@@ -168,7 +168,8 @@ jobs:
 
   build-windows:
     needs: prepare
-    runs-on: windows-latest
+    # Existing audio plugins require the Visual Studio 2022 toolchain.
+    runs-on: windows-2022
     env:
       BUILD_NAME: ${{ needs.prepare.outputs.build_name }}
     steps:
