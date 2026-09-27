@@ -55,6 +55,7 @@ git push origin v0.1.1
 可以同步维护 `pubspec.yaml` 的版本用于本地构建；正式发布时以 tag 为准。
 
 发布脚本只使用 Python 标准库，不需要额外服务器、Apple 签名密钥或个人访问令牌。
+CI 固定使用 Flutter 3.47.5，Android 构建使用 Gradle 8.14.4、AGP 8.11.1 和 Kotlin 2.2.20；升级 Flutter 时需同时检查这些工具的兼容性。
 GitHub 仓库及 Release 附件需要公开可下载；工作流仅在发布 job 使用内置 `GITHUB_TOKEN` 的 `contents: write` 权限。
 请保留应用现有 Bundle ID `com.example.arknightsStoryApp`，以便已有用户继续接收覆盖更新。
 
