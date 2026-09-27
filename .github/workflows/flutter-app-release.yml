@@ -7,11 +7,29 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  BUILD_NUMBER: ${{ github.run_number }}
 
 jobs:
-  build-android:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      build_name: ${{ steps.version.outputs.build_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test release tooling
+        run: python3 -m unittest discover -s scripts/tests -v
+      - name: Resolve app version
+        id: version
+        run: python3 scripts/altstore_source.py version >> "$GITHUB_OUTPUT"
+
+  build-android:
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      BUILD_NAME: ${{ needs.prepare.outputs.build_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -19,7 +37,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build apk --release --split-per-abi
+      - run: flutter build apk --release --split-per-abi --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package Android
         run: |
@@ -39,7 +57,10 @@ jobs:
           retention-days: 1
 
   build-linux:
+    needs: prepare
     runs-on: ubuntu-latest
+    env:
+      BUILD_NAME: ${{ needs.prepare.outputs.build_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -53,7 +74,7 @@ jobs:
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             gstreamer1.0-plugins-base gstreamer1.0-tools gstreamer1.0-x
           flutter pub get
-      - run: flutter build linux --release
+      - run: flutter build linux --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package Linux
         run: |
@@ -69,7 +90,10 @@ jobs:
           retention-days: 1
 
   build-macos:
+    needs: prepare
     runs-on: macos-latest
+    env:
+      BUILD_NAME: ${{ needs.prepare.outputs.build_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -77,7 +101,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build macos --release
+      - run: flutter build macos --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package macOS
         run: |
@@ -96,7 +120,10 @@ jobs:
           retention-days: 1
 
   build-ios:
+    needs: prepare
     runs-on: macos-latest
+    env:
+      BUILD_NAME: ${{ needs.prepare.outputs.build_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -104,7 +131,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build ios --release --no-codesign
+      - run: flutter build ios --release --no-codesign --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package iOS
         run: |
@@ -114,6 +141,19 @@ jobs:
           cp -R build/ios/iphoneos/Runner.app Payload/
           zip -qr "$GITHUB_WORKSPACE/release/arknights_story_ios.ipa" Payload
 
+      - name: Generate SideStore source
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          cp lib/assets/icon.png release/icon.png
+          python3 scripts/altstore_source.py generate \
+            --ipa release/arknights_story_ios.ipa \
+            --app-bundle build/ios/iphoneos/Runner.app \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$GITHUB_REF_NAME" \
+            --expected-version "$BUILD_NAME" \
+            --expected-build "$BUILD_NUMBER" \
+            --output release/apps.json
+
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
         with:
@@ -122,7 +162,10 @@ jobs:
           retention-days: 1
 
   build-windows:
+    needs: prepare
     runs-on: windows-latest
+    env:
+      BUILD_NAME: ${{ needs.prepare.outputs.build_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -132,7 +175,7 @@ jobs:
       - shell: bash
         run: flutter pub get
       - shell: bash
-        run: flutter build windows --release
+        run: flutter build windows --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package Windows
         shell: pwsh
@@ -159,6 +202,12 @@ jobs:
       - build-windows
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    # Merge history only after acquiring the publishing lock.
+    concurrency:
+      group: arknights-story-release
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -167,13 +216,17 @@ jobs:
         with:
           path: release
 
-      - name: Debug release files
-        run: ls -R release
+      - name: Preserve SideStore version history
+        run: python3 scripts/altstore_source.py merge --source release/ios/apps.json
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        # v3 uploads stable-release assets before making the release public.
+        uses: softprops/action-gh-release@v3
         with:
           files: release/**/*
           fail_on_unmatched_files: true
+          prerelease: false
+          make_latest: "true"
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
