@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../config/config.dart';
 import '../config/database.dart';
 import '../story/event_builder.dart';
+import '../story/story_script.dart';
+import '../story/story_preview.dart';
 import '../utils/audio_manager.dart';
 import '../utils/data_retriever.dart';
 
@@ -24,7 +26,7 @@ class StoryPage extends StatefulWidget {
 }
 
 class _StoryPageState extends State<StoryPage> {
-  late Future<List<Map<String, dynamic>>> _storyFuture;
+  late Future<List<StoryEvent>> _storyFuture;
 
   @override
   void initState() {
@@ -39,17 +41,17 @@ class _StoryPageState extends State<StoryPage> {
     super.dispose();
   }
 
-  Future<List<Map<String, dynamic>>> _loadEvents(String storyTxtPath) async {
-    final jsonPath = _toJsonPath(storyTxtPath);
-    final url = '${Database.storyContentPath}$jsonPath';
-    final data = await DataRetriever.getJsonFromURL(url);
-    if (data is! List) {
-      throw Exception('Unexpected story format');
+  Future<List<StoryEvent>> _loadEvents(String path) async {
+    final url = '${Database.storyContentPath}${storyTxtPath(path)}';
+    final text = await DataRetriever.getTextFromURL(url);
+    if (text == null) {
+      throw Exception('Failed to fetch story TXT: $url');
     }
-    return data
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final events = const StoryScriptParser().parse(text);
+    for (final event in events.where((event) => event.issue != null)) {
+      debugPrint('AVG line ${event.lineNumber}: ${event.issue}');
+    }
+    return events;
   }
 
   @override
@@ -59,10 +61,7 @@ class _StoryPageState extends State<StoryPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.storyName ?? 'Story',
-              overflow: TextOverflow.ellipsis,
-            ),
+            Text(widget.storyName ?? 'Story', overflow: TextOverflow.ellipsis),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -71,27 +70,27 @@ class _StoryPageState extends State<StoryPage> {
                     padding: const EdgeInsets.only(right: 8),
                     child: Text(
                       widget.storyCode!,
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: Colors.white70),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelSmall?.copyWith(color: Colors.white70),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 if (widget.storyTag != null && widget.storyTag!.isNotEmpty)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white24,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       widget.storyTag!,
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: Colors.white),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelSmall?.copyWith(color: Colors.white),
                     ),
                   ),
               ],
@@ -114,7 +113,7 @@ class _StoryPageState extends State<StoryPage> {
           ),
         ],
       ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
+      body: FutureBuilder<List<StoryEvent>>(
         future: _storyFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -132,12 +131,14 @@ class _StoryPageState extends State<StoryPage> {
             );
           }
 
-          final events = snapshot.data ?? const <Map<String, dynamic>>[];
+          final sourceEvents = snapshot.data ?? const <StoryEvent>[];
+          final events = sourceEvents
+              .map(storyPreviewEvent)
+              .where((event) => event['type'] != 'unsupported')
+              .toList();
           if (events.isEmpty) {
             return const Center(child: Text('No story content available.'));
           }
-
-          String? lastSpeaker;
 
           return Align(
             alignment: Alignment.topCenter,
@@ -145,136 +146,46 @@ class _StoryPageState extends State<StoryPage> {
               constraints: BoxConstraints(maxWidth: Config.layoutSwitchSize),
               child: ListView.separated(
                 padding: const EdgeInsets.all(16),
-                itemCount: events.length,
+                itemCount: events.length + 1,
                 separatorBuilder: (context, _) => const SizedBox(height: 0),
-                itemBuilder: (context, index) =>
-                    _buildEvent(events[index], () => lastSpeaker, (v) {
-                  lastSpeaker = v;
-                }),
+                itemBuilder: (context, index) => index == 0
+                    ? const Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: Text('基础文本预览：展示所有分支，暂不播放演出和音频。'),
+                      )
+                    : _buildEvent(events[index - 1]),
               ),
             ),
           );
-      },
-    ),
-  );
-}
+        },
+      ),
+    );
+  }
 
-  Widget _buildEvent(
-    Map<String, dynamic> event,
-    String? Function() getLastSpeaker,
-    void Function(String?) setLastSpeaker,
-  ) {
-    final type = (event['type'] ?? '').toString();
-    if (type == "decision"){
-      event['speaker'] = "Dr. {@name}";
-    }
-    switch (type) {
+  Widget _buildEvent(Map<String, dynamic> event) {
+    switch (event['type']) {
       case 'background':
-      // case 'background_tween':
-        return storyBackgroundContainer(
-          imagePath: event['image']?.toString(),
-          fadetime: event['fadetime']?.toString(),
-        );
+        return storyBackgroundContainer(imagePath: event['image']?.toString());
       case 'image':
-      // case 'image_tween':
-      // case 'character_cutin':
-        return storyImageContainer(
-          imagePath: event['image']?.toString(),
-          fadetime: event['fadetime']?.toString(),
-        );
-      // case 'character':
-      // // case 'charslot':
-      //   final name = event['name']?.toString() ?? '';
-      //   if (name.isEmpty) return const SizedBox.shrink();
-      //   return storyCharacterContainer(name: name);
+        return storyImageContainer(imagePath: event['image']?.toString());
       case 'dialog':
       case 'narration':
-      // case 'subtitle':
-        final nextSpeaker = (event['speaker'] ?? '').toString();
-        final showSpeaker =
-            nextSpeaker.isNotEmpty && nextSpeaker != getLastSpeaker();
-        if (showSpeaker) {
-          setLastSpeaker(nextSpeaker);
-        }
         return dialogueContainer(
-          speaker: showSpeaker ? nextSpeaker : '',
+          speaker: (event['speaker'] ?? '').toString(),
           content: (event['content'] ?? '').toString(),
         );
       case 'decision':
-        final nextSpeaker = (event['speaker'] ?? '').toString();
-        final showSpeaker =
-            nextSpeaker.isNotEmpty && nextSpeaker != getLastSpeaker();
-        if (showSpeaker) {
-          setLastSpeaker(nextSpeaker);
-        }
-        return decisionContainer(
-          speaker: (event['speaker'] ?? '').toString(),
-          options: event['options']?.toString() ?? '',
-          onOptionSelected: (idx) {
-            // Handle decision selection here.
-          },
+        return dialogueContainer(
+          speaker: 'Dr. {@nickname}',
+          content: (event['options']?.toString() ?? '')
+              .split(';')
+              .asMap()
+              .entries
+              .map((entry) => '${entry.key + 1}. ${entry.value}')
+              .join('\n'),
         );
-      case 'play_music':
-        _handlePlayMusic(event);
-        return const SizedBox.shrink();
-      case 'stop_music':
-        _handleStopMusic(event);
-        return const SizedBox.shrink();
-      case 'play_sound':
-        _handlePlaySound(event);
-        return const SizedBox.shrink();
       default:
-        // return debugContainer(content:  event.toString(),);
         return const SizedBox.shrink();
     }
   }
-
-  void _handlePlayMusic(Map<String, dynamic> event) {
-    final intro = event['intro']?.toString();
-    final loop = event['key']?.toString();
-    final volume = double.tryParse(event['volume']?.toString() ?? '');
-    if (volume != null) {
-      audio.setVolume(volume);
-    }
-    if (intro != null && loop != null) {
-      audio.intro2loop(
-        '${Database.storyMusicPath}$intro',
-        '${Database.storyMusicPath}$loop',
-      );
-    } else if (loop != null) {
-      audio.loop('${Database.storyMusicPath}$loop');
-    } else if (intro != null) {
-      audio.intro('${Database.storyMusicPath}$intro');
-    }
-  }
-
-  void _handleStopMusic(Map<String, dynamic> event) {
-    audio.stop();
-  }
-
-  void _handlePlaySound(Map<String, dynamic> event) {
-    final key = event['key']?.toString();
-    final volume = double.tryParse(event['volume']?.toString() ?? '');
-    if (key == null) return;
-    audio.playSoundSingle('${Database.storyMusicPath}$key', volume: volume);
-  }
-}
-
-String _toJsonPath(String storyTxtPath) {
-  final trimmed = storyTxtPath.trim();
-  if (trimmed.isEmpty) {
-    throw ArgumentError('storyTxtPath cannot be empty');
-  }
-
-  final withoutLeadingSlash =
-      trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
-  if (withoutLeadingSlash.endsWith('.json')) return withoutLeadingSlash;
-  if (withoutLeadingSlash.endsWith('.txt')) {
-    return withoutLeadingSlash.replaceRange(
-      withoutLeadingSlash.length - 4,
-      withoutLeadingSlash.length,
-      '.json',
-    );
-  }
-  return '$withoutLeadingSlash.json';
 }
