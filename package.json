@@ -6,7 +6,7 @@
     "build:player": "node player_host/prepare.mjs && vite build --config player_host/vite.config.mjs",
     "check:player": "tsc --noEmit -p player_host/tsconfig.json",
     "stage:player": "node player_host/stage.mjs",
-    "test:player": "node --test player_host/source.test.mjs player_host/resources.test.mjs"
+    "test:player": "node --test player_host/source.test.mjs player_host/resources.test.mjs player_host/loading-window.test.mjs"
   },
   "dependencies": {
     "@pixi/sound": "6.0.1",

@@ -5,6 +5,7 @@ import { preloadContextAssets } from '../third_party/prts-widgets/src/widgets/St
 import { parseScript } from '../third_party/prts-widgets/src/widgets/StoryPlayer/engine/parser';
 import { resolveScriptURL } from './source.mjs';
 import { resourceSource, githubCharacterContext } from './resources.mjs';
+import { loadingWindow } from './loading-window.mjs';
 import type { StoryPlayer } from '../third_party/prts-widgets/src/widgets/StoryPlayer/engine/types';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -73,6 +74,14 @@ async function load() {
     if (current !== generation || disposed) return;
     const context = source === 'github' ? githubCharacterContext(originalContext) : originalContext;
     const lines = parseScript(context.script);
+    const windowContext = (line: number) => {
+      const script = loadingWindow(context.script, lines, line);
+      // Legacy charMap contains chapter-wide references; collect this window
+      // using the same linkMap/resolvers as the upstream renderer instead.
+      return { ...context, charMap: {}, script, scriptText: script.join('\n') };
+    };
+    stage.dataset.loading = 'windowed';
+    stage.dataset.openingLines = String(windowContext(1).script.length);
     const timeout = setTimeout(() => {
       if (current === generation && !ready) {
         generation++;
@@ -80,10 +89,10 @@ async function load() {
       }
     }, 90000);
     try {
-      await preloadContextAssets(context, value => {
+      await preloadContextAssets(windowContext(1), value => {
         if (current !== generation || disposed) return;
         progress.value = value;
-        status.textContent = `${source === 'github' ? 'GitHub Raw' : 'PRTS'} · 预加载背景、立绘、字体和音频 ${Math.round(value * 100)}%`;
+        status.textContent = `${source === 'github' ? 'GitHub Raw' : 'PRTS'} · 准备开场资源和字体 ${Math.round(value * 100)}%`;
       });
     } finally { clearTimeout(timeout); }
     if (current !== generation || disposed) return;
@@ -94,14 +103,36 @@ async function load() {
     heading.textContent = '准备就绪';
     const loadMs = Math.round(performance.now() - started);
     stage.dataset.loadMs = String(loadMs);
-    status.textContent = `${source === 'github' ? 'GitHub Raw' : 'PRTS'} · 加载完成，用时 ${(loadMs / 1000).toFixed(1)} 秒。点击开始启用音频。`;
+    status.textContent = `${source === 'github' ? 'GitHub Raw' : 'PRTS'} · 开场就绪，用时 ${(loadMs / 1000).toFixed(1)} 秒。后续资源随阅读加载，点击开始启用音频。`;
     progress.value = 1;
     start.textContent = '开始阅读';
     start.disabled = false;
     restart.disabled = false;
     start.onclick = () => { void begin(); };
+    let pendingLine: number | null = null;
+    let warming = false;
+    const warmAhead = async () => {
+      if (warming) return;
+      warming = true;
+      try {
+        while (pendingLine !== null && current === generation && !disposed) {
+          const nextLine = pendingLine;
+          pendingLine = null;
+          try { await preloadContextAssets(windowContext(nextLine)); }
+          catch (error) {
+            // Speculative loading must not interrupt the current dialogue.
+            // Upstream Assets.load retries the actual resource when needed.
+            console.warn('[PRTS host] lookahead preload failed', error);
+          }
+        }
+      } finally { warming = false; }
+    };
     player.onDisplayedLineChange(line => {
       stage.dataset.line = line?.toString() ?? '';
+      if (line !== null && line !== undefined && current === generation && !disposed) {
+        pendingLine = line;
+        void warmAhead();
+      }
       // Despite its name, upstream emits the physical, 1-based source line.
       const entry = lines.find(entry => entry.lineNumber === line && entry.kind !== 'command');
       if (entry && entry.kind !== 'command') {

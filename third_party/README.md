@@ -74,7 +74,12 @@ python -m http.server 8080 --bind 0.0.0.0 --directory build/web
 2. 独立 Vite 构建直接打包上游引擎，不依赖完整 Vue Wiki 外壳。
 3. 字体、character.json、background.json、story_variables.json 在构建时缓存到本地宿主。
    Vite 适配器改写其交付 URL；若上游契约改变则构建失败，submodule 文件保持不变。
-   对话渲染前等待字体和资源预加载。用户点击开始后解锁 WebAudio。
+   对话渲染前只等待开场窗口的字体和资源。用户点击开始后解锁 WebAudio。
+   `loading-window.mjs` 使用上游解析器的物理行边界选择当前及后续共 8 段非空文本，
+   最多扫描 160 条解析记录；保留反斜杠续行，不改变剧情执行与分支语义。
+   阅读行变化时串行预热新窗口；快速推进只保留最新待处理位置。
+   窗口之外的资源（包括分支跳转）由引擎按需加载，预热失败不打断当前阅读。
+   不再等待整章下载；网络慢或快速跳转时，仍可能在首次使用资源处短暂等待。
 4. `resources.mjs` 将上游资源路由的结果映射到 `akgcc/arkdata` 的 GitHub Raw。
    背景对应 `assets/torappu/dynamicassets/avg/backgrounds/`，图片对应同层 `images/`，
    音频对应 `assets/torappu/dynamicassets/audio/sound_beta_2/`。
