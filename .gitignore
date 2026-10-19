@@ -34,6 +34,9 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+node_modules/
+web/prts-player/
+player_host/public/
 
 # Symbolication related
 app.*.symbols

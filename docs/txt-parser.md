@@ -1,5 +1,8 @@
 # 原版 TXT 解析基础
 
+网页版正文现由 PRTS 上游引擎播放，见 [桥接与构建说明](../third_party/README.md)。
+下述 Dart 解析器和基础播放器保留给非 Web 平台及独立测试，不参与网页正文演出。
+
 参考 PRTS [StoryPlayer](https://prts.wiki/w/微件:StoryPlayer) 及其
 [parser.ts](https://github.com/MooncellWiki/prts-widgets/blob/main/src/widgets/StoryPlayer/engine/parser.ts)。
 本项目独立实现 Dart 扫描器，只参考语法与职责划分，不依赖 Web 播放器。

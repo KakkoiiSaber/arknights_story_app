@@ -1,0 +1,24 @@
+{
+  "name": "arknights-storyplayer-host",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:player": "node player_host/prepare.mjs && vite build --config player_host/vite.config.mjs",
+    "check:player": "tsc --noEmit -p player_host/tsconfig.json",
+    "stage:player": "node player_host/stage.mjs",
+    "test:player": "node --test player_host/source.test.mjs player_host/resources.test.mjs"
+  },
+  "dependencies": {
+    "@pixi/sound": "6.0.1",
+    "mitt": "3.0.1",
+    "pixi.js": "8.21.0"
+  },
+  "devDependencies": {
+    "magic-string": "0.30.21",
+    "typescript": "6.0.3",
+    "vite": "7.3.7"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

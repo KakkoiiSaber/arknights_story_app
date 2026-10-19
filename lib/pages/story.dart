@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config/database.dart';
 import '../story/story_player.dart';
 import '../story/story_player_view.dart';
 import '../story/story_script.dart';
+import '../story/prts_story_stub.dart'
+    if (dart.library.js_interop) '../story/prts_story_web.dart';
 import '../utils/data_retriever.dart';
 
 class StoryPage extends StatefulWidget {
@@ -26,7 +29,7 @@ class _StoryPageState extends State<StoryPage> {
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    if (!kIsWeb) _future = _load();
   }
 
   Future<StoryPlayer> _load() async {
@@ -44,56 +47,70 @@ class _StoryPageState extends State<StoryPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xff090d12),
-    body: FutureBuilder<StoryPlayer>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          return StoryPlayerView(
-            player: snapshot.data!,
+    body: kIsWeb
+        ? PrtsStoryView(
+            scriptURL:
+                '${Database.storyContentPath}${storyTxtPath(widget.storyTxtPath)}',
             title: [
               widget.storyCode,
               widget.storyName ?? 'Story',
               widget.storyTag,
             ].whereType<String>().where((part) => part.isNotEmpty).join(' · '),
-          );
-        }
-        return SafeArea(
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: BackButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
+          )
+        : FutureBuilder<StoryPlayer>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                return StoryPlayerView(
+                  player: snapshot.data!,
+                  title:
+                      [
+                            widget.storyCode,
+                            widget.storyName ?? 'Story',
+                            widget.storyTag,
+                          ]
+                          .whereType<String>()
+                          .where((part) => part.isNotEmpty)
+                          .join(' · '),
+                );
+              }
+              return SafeArea(
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: BackButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: snapshot.hasError
+                            ? Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${snapshot.error}',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    OutlinedButton(
+                                      onPressed: () =>
+                                          setState(() => _future = _load()),
+                                      child: const Text('重试'),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const CircularProgressIndicator(),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Expanded(
-                child: Center(
-                  child: snapshot.hasError
-                      ? Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${snapshot.error}',
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              OutlinedButton(
-                                onPressed: () =>
-                                    setState(() => _future = _load()),
-                                child: const Text('重试'),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const CircularProgressIndicator(),
-                ),
-              ),
-            ],
+              );
+            },
           ),
-        );
-      },
-    ),
   );
 }
