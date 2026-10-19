@@ -4,7 +4,6 @@ import MagicString from 'magic-string';
 
 // Delivery adaptation only. Keep all upstream AVG behavior unchanged.
 const remoteFontURL = '`https://static.prts.wiki/${file}`';
-const resourceModule = fileURLToPath(new URL('./resources.mjs', import.meta.url)).replaceAll('\\', '/');
 export default defineConfig({
   root: fileURLToPath(new URL('./', import.meta.url)),
   base: './',
@@ -15,22 +14,6 @@ export default defineConfig({
     enforce: 'pre',
     transform(source, id) {
       const path = id.replaceAll('\\', '/');
-      if (path.endsWith('/StoryPlayer/engine/asset.ts')) {
-        const output = new MagicString(source);
-        output.prepend(`import { routeAssetURL } from ${JSON.stringify(resourceModule)};\n`);
-        for (const name of ['resolveAssetUrl', 'resolveStoryAssetByKey',
-          'resolveStoryCharacterAssetByKey', 'resolveStoryVideoByKey', 'resolveStoryAudioByKey']) {
-          const signature = `export function ${name}(`;
-          const start = source.indexOf(signature);
-          if (start < 0 || source.indexOf(signature, start + 1) >= 0) {
-            throw new Error(`Upstream asset contract changed: ${name}`);
-          }
-          const internal = `_arkUpstream_${name}`;
-          output.overwrite(start, start + signature.length, `function ${internal}(`);
-          output.append(`\nexport function ${name}(...args: Parameters<typeof ${internal}>) { return routeAssetURL(${internal}(...args)); }\n`);
-        }
-        return {code: output.toString(), map: output.generateMap({hires: true, source: id, includeContent: true})};
-      }
       if (path.endsWith('/StoryPlayer/context.ts')) {
         const output = new MagicString(source);
         for (const [remote, local] of [

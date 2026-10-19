@@ -59,35 +59,34 @@ python -m http.server 8080 --bind 0.0.0.0 --directory build/web
 构建目录，避免增量构建缓存遗漏新增文件。两者均已加入 Web 发布 workflow。
 源码、lockfile 和 submodule 指针入库，`node_modules`、生成的 JS 和缓存字体不入库。
 
-主页入口不变：黑暗时代·上 → 序章·上 → 等待预加载 → 点击“开始阅读”。
+主页入口不变：黑暗时代·上 → 序章·上 → 显示加载中 → 就绪后自动播放。
 也可直接打开 `/prts-player/index.html`，默认就是
 `obt/guide/beg/0_welcome_to_guide.txt`，便于单独检查上游演出。
 正文可点击/空格推进、全屏、重新阅读；图片、动画和音频由原始上游引擎执行。
 加载失败会显示原因并提供重试。初始化失败、网络中断时不自动退回简化播放器。
 
-资源来源默认是 GitHub Raw，可在播放器顶部切换为 PRTS CDN 对照。
-直接链接使用 `?resources=github` 或 `?resources=prts`，切换会重新载入当前剧情。
+网页版正文的背景、立绘、音频使用 PRTS 的地址及原始资源解析规则；
+原版 TXT 保留 Kengxxiao 的 GitHub Raw 来源，由 PRTS 引擎解析。
+没有资源来源选择或“开始阅读”确认；旧 `resources` 查询参数也不再切换资源来源。
+首页、活动主题页及其封面、背景和主题音乐继续使用原有 GitHub Raw 配置。
 
 ## 资源与构建适配
 
 1. Flutter 将当前语言的 Kengxxiao 原版 TXT URL 传入宿主，仅接受指定上游仓库的 TXT。
+   TXT 保留现有来源；演出素材使用 PRTS，不依赖 arkdata 的媒体目录映射。
 2. 独立 Vite 构建直接打包上游引擎，不依赖完整 Vue Wiki 外壳。
 3. 字体、character.json、background.json、story_variables.json 在构建时缓存到本地宿主。
    Vite 适配器改写其交付 URL；若上游契约改变则构建失败，submodule 文件保持不变。
-   对话渲染前只等待开场窗口的字体和资源。用户点击开始后解锁 WebAudio。
+   对话渲染前只等待开场窗口的字体和资源，就绪后直接调用 start。
+   自动尝试恢复 WebAudio，但不等待 resume 完成以免阻塞画面；如果浏览器限制
+   自动出声，在首次 pointerdown、click 或 keydown 时再次解锁音频。
    `loading-window.mjs` 使用上游解析器的物理行边界选择当前及后续共 8 段非空文本，
    最多扫描 160 条解析记录；保留反斜杠续行，不改变剧情执行与分支语义。
    阅读行变化时串行预热新窗口；快速推进只保留最新待处理位置。
    窗口之外的资源（包括分支跳转）由引擎按需加载，预热失败不打断当前阅读。
    不再等待整章下载；网络慢或快速跳转时，仍可能在首次使用资源处短暂等待。
-4. `resources.mjs` 将上游资源路由的结果映射到 `akgcc/arkdata` 的 GitHub Raw。
-   背景对应 `assets/torappu/dynamicassets/avg/backgrounds/`，图片对应同层 `images/`，
-   音频对应 `assets/torappu/dynamicassets/audio/sound_beta_2/`。
-   立绘从 PRTS 的 0-based body/index 转为 `assets/avg/characters/base#表情$姿势.png`，
-   使用预合成图片，同时保留上游位置、原生尺寸、别名和身体分组信息。
-   PRTS 模式不转换立绘表示，使用原始 CDN 素材；两种模式共享本地元数据和字体。
-   未适配媒体种类和缺少映射的角色在实际引用时明确报错，不静默切回 PRTS。
-   序章的 17 个 PNG 和 12 个 MP3 地址已逐项验证；其他章节仍需检查完整覆盖。
+4. 保留上游 `engine/asset.ts` 的 PRTS 资源路由和 character.json 角色表示。
+   宿主不再转换 arkdata 的目录、表情与姿势文件名；没有 GitHub 媒体回退。
 5. 原生移动 WebView、离线媒体缓存和更多章节的演出回归仍待后续实现。
 
 元数据缓存可用 `node player_host/prepare.mjs --refresh-metadata` 主动刷新，
