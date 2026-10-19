@@ -74,6 +74,9 @@ python scripts/altstore_source.py version --ref refs/tags/v0.1.1
 
 ## 数据与资源
 
+PRTS StoryPlayer 上游以 Git submodule 引入；初始化、版本更新和 Flutter 嵌入方案见
+[上游播放器依赖说明](third_party/README.md)。目前正文播放器尚未切换到上游引擎。
+
 review data and assets:
 [story review meta/audio/info data](https://github.com/KakkoiiSaber/arknights_story_data/tree/main/assets)
 [story review cover/title/bg/bgmusic assets](https://github.com/KakkoiiSaber/arkdata/tree/main/assets)

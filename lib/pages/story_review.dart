@@ -53,13 +53,15 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     await audio.stop();
   }
 
-  void _openStory({
+  Future<void> _openStory({
     required String storyTxt,
     String? storyName,
     String? storyCode,
     String? storyTag,
-  }) {
-    Navigator.of(context).push(
+  }) async {
+    await _stopAllAudio();
+    if (!mounted) return;
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => StoryPage(
           storyTxtPath: storyTxt,
@@ -69,6 +71,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         ),
       ),
     );
+    if (mounted) await _playBgMusic(gameMusicName);
   }
 
   Future<void> _loadStory() async {
