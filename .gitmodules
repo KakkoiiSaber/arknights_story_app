@@ -1,0 +1,4 @@
+[submodule "third_party/prts-widgets"]
+	path = third_party/prts-widgets
+	url = https://github.com/MooncellWiki/prts-widgets.git
+	branch = main

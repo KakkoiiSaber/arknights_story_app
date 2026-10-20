@@ -17,6 +17,19 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Build PRTS player host
+        run: |
+          npm ci
+          npm run test:player
+          npm run check:player
+          npm run build:player
 
       - uses: subosito/flutter-action@v2
         with:
@@ -28,7 +41,10 @@ jobs:
         run: flutter pub get
 
       - name: Build Flutter Web
-        run: flutter build web --release --base-href /arknights_story_app/
+        run: |
+          dart run tool/package_player.dart
+          flutter build web --release --base-href /arknights_story_app/
+          npm run stage:player
 
       - name: Update docs folder
         run: |

@@ -1,23 +1,34 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import '../config/config.dart';
+import '../downloads/review_service.dart';
+import 'audio_backend_native.dart'
+    if (dart.library.js_interop) 'audio_backend_web.dart';
+
+import 'music_controller.dart';
 
 final audio = AudioManager();
 
 class AudioManager {
-  final AudioPlayer _intro = AudioPlayer();
-  final AudioPlayer _loop = AudioPlayer();
-  final AudioPlayer _sfx = AudioPlayer();
+  final MusicController _music = MusicController(
+    createPlayer: () => _MusicPlayerAdapter(),
+    onError: (error, stack) => log(
+      'Music playback failed: $error',
+      stackTrace: stack,
+      name: 'AudioManager',
+    ),
+  );
+  final AppAudioPlayer _sfx = AppAudioPlayer();
 
   double _masterVolume = 1.0;
-  final ValueNotifier<bool> soundEnabled =
-      ValueNotifier<bool>(Config.isSoundEnabled);
+  final ValueNotifier<bool> soundEnabled = ValueNotifier<bool>(
+    Config.isSoundEnabled,
+  );
 
   Future<void> init() async {
-    await _intro.setReleaseMode(ReleaseMode.stop);
-    await _loop.setReleaseMode(ReleaseMode.loop);
     await _sfx.setReleaseMode(ReleaseMode.stop);
     await _applyVolume();
   }
@@ -35,17 +46,7 @@ class AudioManager {
     await setEnabled(!soundEnabled.value);
   }
 
-  // play only once intro
-  Future<void> intro(String? url) async {
-    if (!await _setSourceSafely(_intro, url)) return;
-    await _resumeSafely(_intro);
-  }
-
-  // play looped music
-  Future<void> loop(String? url) async {
-    if (!await _setSourceSafely(_loop, url)) return;
-    await _resumeSafely(_loop);
-  }
+  MusicScope claimMusic() => _music.claim();
 
   /// Play one-shot SFX on a dedicated channel (replaces previous SFX).
   Future<void> playSoundSingle(String? url, {double? volume}) async {
@@ -64,37 +65,8 @@ class AudioManager {
   Future<void> playSound(String? url, {double? volume}) =>
       playSoundSingle(url, volume: volume);
 
-  Future<void> intro2loop(String? introURL, String? loopURL) async {
-    final introReady = await _setSourceSafely(_intro, introURL);
-    final loopReady = await _setSourceSafely(_loop, loopURL);
-
-    // If the loop track fails to load, don't start playback to avoid errors.
-    if (!loopReady) return;
-
-    // Play intro, then start loop immediately after completion
-    if (introReady) {
-      final playedIntro = await _resumeSafely(_intro);
-      if (!playedIntro) {
-        await _resumeSafely(_loop);
-        return;
-      }
-      _intro.onPlayerComplete.first.then((_) async {
-        await _resumeSafely(_loop);
-      }).catchError((Object e, StackTrace st) {
-        log('Audio onPlayerComplete -> loop failed: $e',
-            stackTrace: st, name: 'AudioManager');
-      });
-      return;
-    }
-
-    // If intro failed, start loop directly.
-    await _resumeSafely(_loop);
-  }
-
   Future<void> stop() async {
-    await _intro.stop();
-    await _loop.stop();
-    await _sfx.stop();
+    await Future.wait([_music.stop(), _sfx.stop()]);
   }
 
   Future<void> setVolume(double volume) async {
@@ -107,39 +79,70 @@ class AudioManager {
   }
 
   Future<void> dispose() async {
-    await _intro.dispose();
-    await _loop.dispose();
+    await _music.stop();
     await _sfx.dispose();
   }
 
   Future<void> _applyVolume() async {
     final effective = Config.isSoundEnabled ? _masterVolume : 0.0;
-    await _intro.setVolume(effective);
-    await _loop.setVolume(effective);
+    await _music.setVolume(effective);
     await _sfx.setVolume(effective);
   }
 
-  Future<bool> _setSourceSafely(AudioPlayer player, String? url) async {
+  Future<bool> _setSourceSafely(
+    AppAudioPlayer player,
+    String? url, {
+    bool Function()? isCurrent,
+  }) async {
     if (url == null || url.isEmpty) return false;
 
     try {
-      await player.setSource(UrlSource(url));
+      final localFile = await reviewAssets.localPath(url);
+      if (isCurrent != null && !isCurrent()) return false;
+      await player.setSource(
+        reviewAudioSource(url, null, localFile: localFile),
+      );
       return true;
     } catch (e, st) {
-      log('Audio setSource failed for $url: $e',
-          stackTrace: st, name: 'AudioManager');
+      log(
+        'Audio setSource failed for $url: $e',
+        stackTrace: st,
+        name: 'AudioManager',
+      );
       return false;
     }
   }
 
-  Future<bool> _resumeSafely(AudioPlayer player) async {
+  Future<bool> _resumeSafely(AppAudioPlayer player) async {
     try {
       await player.resume();
       return true;
     } catch (e, st) {
-      log('Audio resume failed: $e',
-          stackTrace: st, name: 'AudioManager');
+      log('Audio resume failed: $e', stackTrace: st, name: 'AudioManager');
       return false;
     }
   }
+}
+
+class _MusicPlayerAdapter implements MusicPlayer {
+  final AppAudioPlayer _player = AppAudioPlayer();
+
+  @override
+  Stream<void> get completed => _player.onPlayerComplete;
+
+  @override
+  Future<void> load(String url, {required bool loop}) async {
+    await _player.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.stop);
+    final localFile = await reviewAssets.localPath(url);
+    await _player.setSource(reviewAudioSource(url, null, localFile: localFile));
+  }
+
+  @override
+  Future<void> play() => _player.resume();
+
+  @override
+  Future<void> setVolume(double volume) => _player.setVolume(volume);
+
+  @override
+  Future<void> dispose() => _player.dispose();
 }
