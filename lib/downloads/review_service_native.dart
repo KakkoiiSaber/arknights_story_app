@@ -18,6 +18,9 @@ class ReviewAssetService extends ChangeNotifier {
   String? get revision => _cache?.revision;
   String? get error => _error ?? _cache?.downloadError ?? _cache?.updateError;
   bool get checking => _cache?.checking ?? false;
+  double? get catalogProgress => _cache?.catalogProgress;
+  int get catalogDownloadedBytes => _cache?.catalogDownloadedBytes ?? 0;
+  int get catalogTotalBytes => _cache?.catalogTotalBytes ?? 0;
   bool get running => _cache?.running ?? false;
   bool get clearing => _cache?.clearing ?? false;
   String get state => _cache?.state ?? 'idle';
