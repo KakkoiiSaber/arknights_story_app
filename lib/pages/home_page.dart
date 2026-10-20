@@ -86,6 +86,18 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _retryCatalog() {
+    setState(() {
+      _storyMetaFuture = DataRetriever.getJsonFromURL(
+        Database.storyMetaTablePath,
+      );
+      _homeAudioFuture = DataRetriever.getJsonFromURL(
+        Database.gameMusicDataPath,
+      );
+    });
+    _playHomeMusic();
+  }
+
   @override
   void dispose() {
     reviewAssets.removeListener(_reviewUpdated);
@@ -150,7 +162,7 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-            const ReviewDownloadPanel(compact: true),
+            ReviewDownloadPanel(compact: true, onRetry: _retryCatalog),
             AnimatedSize(
               duration: ArchiveStyle.motion(context, 200),
               curve: Curves.easeOutCubic,
@@ -227,6 +239,7 @@ class _HomePageState extends State<HomePage> {
                 filter: _filter,
                 query: _search.text,
                 onStoryClosed: _playHomeMusic,
+                onRetry: _retryCatalog,
               ),
             ),
           ],
