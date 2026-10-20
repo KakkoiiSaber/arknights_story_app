@@ -4,6 +4,20 @@ import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 const upstream = new URL('third_party/prts-widgets/', root);
+const revision = execFileSync('git', ['rev-parse', 'HEAD'], {
+  cwd: fileURLToPath(upstream), encoding: 'utf8',
+}).trim();
+// A successful Web build already publishes these PRTS inputs in this repo.
+// Reuse only a snapshot built from the same pinned engine revision.
+const publishedDir = new URL('docs/prts-player/', root);
+let matchingSnapshot = false;
+try {
+  matchingSnapshot = JSON.parse(await readFile(new URL('upstream.json', publishedDir), 'utf8')).revision === revision;
+} catch { /* No published snapshot yet; fetch directly from PRTS. */ }
+async function publishedInput(path) {
+  if (!matchingSnapshot) return null;
+  try { return await readFile(new URL(path, publishedDir)); } catch { return null; }
+}
 // Cache build inputs outside the submodule. Never run upstream publish scripts.
 const publicDir = new URL('./public/', import.meta.url);
 for (const [path, upstreamURL] of [
@@ -14,6 +28,16 @@ for (const [path, upstreamURL] of [
   const destination = new URL(`metadata/${path}`, publicDir);
   if (!process.argv.includes('--refresh-metadata')) {
     try { JSON.parse(await readFile(destination, 'utf8')); continue; } catch {}
+    const snapshot = await publishedInput(`metadata/${path}`);
+    if (snapshot) {
+      try {
+        const data = JSON.parse(snapshot.toString('utf8'));
+        if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid snapshot');
+        await mkdir(new URL('./', destination), {recursive: true});
+        await writeFile(destination, JSON.stringify(data));
+        continue;
+      } catch { /* Invalid snapshot; fetch and validate a fresh copy. */ }
+    }
   }
   let lastError;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -39,6 +63,11 @@ if (!filenames.length) throw new Error('No upstream fonts found; review the buil
 for (const file of filenames) {
   const destination = new URL(`fonts/${file}`, publicDir);
   try { if ((await readFile(destination)).length > 1000) continue; } catch {}
+  const snapshot = await publishedInput(`fonts/${file}`);
+  if (snapshot && snapshot.length > 1000 && snapshot.subarray(0, 4).toString() === 'wOF2') {
+    await writeFile(destination, snapshot);
+    continue;
+  }
   let lastError;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -56,9 +85,6 @@ for (const file of filenames) {
   if (lastError) throw lastError;
 }
 await copyFile(new URL('LICENSE', upstream), new URL('UPSTREAM-LICENSE.txt', publicDir));
-const revision = execFileSync('git', ['rev-parse', 'HEAD'], {
-  cwd: fileURLToPath(upstream), encoding: 'utf8',
-}).trim();
 await writeFile(new URL('upstream.json', publicDir), JSON.stringify({
   repository: 'https://github.com/MooncellWiki/prts-widgets', revision,
   fonts: filenames, hostProtocol: 1,
