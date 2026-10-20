@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/database.dart';
-import '../config/config.dart';
+import '../config/archive_style.dart';
+import '../components/story_chapter_entry.dart';
 import '../config/story_themes.dart';
 import '../components/story_background.dart';
 import '../utils/audio_manager.dart';
@@ -23,7 +24,7 @@ class StoryReviewPage extends StatefulWidget {
 }
 
 class _StoryReviewPageState extends State<StoryReviewPage> {
-  static final double _layoutSwitchSize = Config.layoutSwitchSize;
+  final _scroll = ScrollController();
 
   Map<String, dynamic>? _story;
   bool _loading = true;
@@ -63,8 +64,9 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     await _stopAllAudio();
     if (!mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => StoryPage(
+      archiveRoute(
+        context,
+        (_) => StoryPage(
           storyTxtPath: storyTxt,
           storyName: storyName,
           storyCode: storyCode,
@@ -208,343 +210,256 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   void dispose() {
     // Stop page-specific music when leaving (remove if you want continuous music)
     audio.stop();
+    _scroll.dispose();
     super.dispose();
   }
 
-  Widget _buildBackButton() {
-    return Positioned(
-      top: 12,
-      left: 12,
-      child: SafeArea(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(22),
+  Widget _artwork() => AnimatedOpacity(
+    opacity: _bgLoaded ? 1 : 0,
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : widget.fadeDuration,
+    child: StoryBackground(
+      images: _bgProviders,
+      aspectRatio: _theme?.backgroundAspectRatio ?? 16 / 9,
+    ),
+  );
+
+  Widget _gradient({required bool wide}) => IgnorePointer(
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        if (wide)
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Colors.transparent,
+                  Color(0x12000000),
+                  Color(0x85000000),
+                  Color(0xe8000000),
+                  Colors.black,
+                ],
+                stops: [0.32, 0.45, 0.61, 0.79, 1],
+              ),
+            ),
           ),
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.of(context).maybePop(),
-            tooltip: 'Back',
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: wide
+                  ? const [
+                      Color(0x50000000),
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black,
+                    ]
+                  : const [
+                      Color(0x30000000),
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black,
+                    ],
+              stops: const [0, 0.14, 0.72, 1],
+            ),
           ),
         ),
-      ),
+      ],
+    ),
+  );
+
+  Widget _details({required bool compact}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (_titleProvider != null)
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 300, maxHeight: 160),
+          child: Image(
+            image: _titleProvider!,
+            width: 280,
+            fit: BoxFit.contain,
+            alignment: Alignment.centerLeft,
+            errorBuilder: (_, _, _) => _name(),
+          ),
+        )
+      else
+        _name(),
+      const SizedBox(height: 18),
+      if (desc?.trim().isNotEmpty == true) ...[
+        Text(
+          desc!,
+          style: TextStyle(
+            color: const Color(0xffd0d2d6),
+            fontSize: compact ? 12 : 14,
+            height: 1.9,
+          ),
+        ),
+        const SizedBox(height: 26),
+      ],
+      for (var i = 0; i < infoUnlockDatas.length; i++)
+        _chapter(
+          infoUnlockDatas[i] as Map,
+          compact: compact,
+          last: i == infoUnlockDatas.length - 1,
+        ),
+      if (infoUnlockDatas.isEmpty)
+        const Text('暂无可阅读章节', style: TextStyle(color: ArchiveStyle.muted)),
+    ],
+  );
+
+  Widget _name() => Text(
+    name ?? '',
+    style: const TextStyle(
+      color: ArchiveStyle.foreground,
+      fontSize: 27,
+      letterSpacing: 2,
+    ),
+  );
+
+  Widget _chapter(Map data, {required bool compact, required bool last}) {
+    final txt = data['storyTxt'] as String?;
+    return StoryChapterEntry(
+      name: data['storyName'] as String? ?? '',
+      description: data['storyDesc'] as String? ?? '',
+      code: data['storyCode'] as String?,
+      tag: data['avgTag'] as String?,
+      compact: compact,
+      last: last,
+      onTap: txt == null || txt.isEmpty
+          ? null
+          : () => _openStory(
+              storyTxt: txt,
+              storyName: data['storyName'] as String?,
+              storyCode: data['storyCode'] as String?,
+              storyTag: data['avgTag'] as String?,
+            ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final hasData = !_loading && _story != null;
-    final hasBackgroundId = hasData && _backgroundUrls.isNotEmpty;
-    final showBackgroundLayer = hasData && hasBackgroundId;
-    final showError = !_loading && _error != null;
-    final canShowContent = hasData;
-
-    return Scaffold(
-      body: Stack(
+  Widget _controls() => SafeArea(
+    child: Padding(
+      padding: const EdgeInsets.all(10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          if (showBackgroundLayer)
-            Positioned.fill(
-              child: AnimatedOpacity(
-                opacity: _bgLoaded ? 1 : 0,
-                duration: widget.fadeDuration,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    StoryBackground(
-                      images: _bgProviders,
-                      aspectRatio: _theme?.backgroundAspectRatio ?? 16 / 9,
+          Material(
+            color: Colors.black.withValues(alpha: 0.5),
+            child: IconButton(
+              tooltip: '返回故事库',
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_back, size: 21),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.black,
+    body: LayoutBuilder(
+      builder: (context, constraints) {
+        final wide =
+            constraints.maxWidth >= 700 ||
+            (constraints.maxWidth >= 600 &&
+                constraints.maxWidth > constraints.maxHeight);
+        final compact = constraints.maxHeight < 480;
+        // Match the artwork's reserved right-hand area at every screen size.
+        // A pixel cap would squeeze this into a narrow strip on wide monitors.
+        final infoWidth = constraints.maxWidth * 0.40;
+        final artHeight = (constraints.maxWidth * 0.68).clamp(250.0, 340.0);
+        final hasData = !_loading && _story != null;
+        return Stack(
+          children: [
+            if (wide && _backgroundUrls.isNotEmpty) ...[
+              Positioned.fill(child: _artwork()),
+              Positioned.fill(child: _gradient(wide: true)),
+            ],
+            if (hasData)
+              if (wide)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: SafeArea(
+                    left: false,
+                    child: SizedBox(
+                      width: infoWidth,
+                      height: double.infinity,
+                      child: Scrollbar(
+                        controller: _scroll,
+                        child: SingleChildScrollView(
+                          controller: _scroll,
+                          key: PageStorageKey('story-info-${widget.storyId}'),
+                          padding: EdgeInsets.fromLTRB(
+                            22,
+                            compact ? 54 : 64,
+                            24,
+                            32,
+                          ),
+                          child: _details(compact: compact),
+                        ),
+                      ),
                     ),
-                    // Darken background for readability.
-                    Container(color: Colors.black.withValues(alpha: 0.2)),
+                  ),
+                )
+              else
+                Scrollbar(
+                  controller: _scroll,
+                  child: SingleChildScrollView(
+                    controller: _scroll,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: artHeight,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [_artwork(), _gradient(wide: false)],
+                          ),
+                        ),
+                        SafeArea(
+                          top: false,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                            child: _details(compact: false),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            if (_loading)
+              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            if (_error != null && !hasData)
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '故事加载失败',
+                      style: TextStyle(color: ArchiveStyle.muted),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _loading = true;
+                          _error = null;
+                        });
+                        _loadStory();
+                      },
+                      child: const Text('重试'),
+                    ),
                   ],
                 ),
               ),
-            ),
-          Positioned.fill(
-            child: Container(
-              padding: const EdgeInsets.only(
-                top: 16,
-                left: 16,
-                right: 16,
-                // bottom: 16,
-              ),
-              color: showBackgroundLayer
-                  ? Colors.black.withValues(alpha: 0.25)
-                  : null,
-              child: SafeArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final available = constraints.maxWidth;
-                    final targetWidth = available > _layoutSwitchSize
-                        ? 0.4 * available
-                        : available;
-                    final isWide = constraints.maxWidth >= 800;
-                    final titleSize = isWide ? 18.0 : 16.0;
-                    final codeSize = isWide ? 13.0 : 12.0;
-                    final descSize = isWide ? 15.0 : 14.0;
-                    final primaryText = Colors.white.withValues(alpha: 0.92);
-                    final secondaryText = Colors.white70;
-
-                    return Align(
-                      alignment: Alignment.topRight,
-                      child: SizedBox(
-                        width: targetWidth,
-                        child: AnimatedOpacity(
-                          duration: widget.fadeDuration,
-                          opacity: canShowContent ? 1 : 0,
-                          child: canShowContent
-                              ? AnimatedSwitcher(
-                                  duration: widget.fadeDuration,
-                                  child: SingleChildScrollView(
-                                    key: const ValueKey('story-content'),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (_titleProvider != null)
-                                          SizedBox(
-                                            height: 150,
-                                            width: _theme?.titleIsBanner == true
-                                                ? 300
-                                                : 200,
-                                            child: Image(
-                                              image: _titleProvider!,
-                                              fit: BoxFit.contain,
-                                            ),
-                                          ),
-                                        if (_titleProvider != null)
-                                          const SizedBox(height: 8),
-                                        if (_titleProvider == null)
-                                          Text(
-                                            name ?? '',
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.headlineSmall,
-                                          ),
-                                        // Text(
-                                        //   name ?? '',
-                                        //   style: Theme.of(context)
-                                        //       .textTheme
-                                        //       .headlineSmall
-                                        //       ?.copyWith(
-                                        //         color: primaryText,
-                                        //         fontWeight: FontWeight.w600,
-                                        //       ),
-                                        // ),
-                                        if (desc != null) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            desc!,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .labelLarge
-                                                ?.copyWith(
-                                                  color: Colors.white70,
-                                                ),
-                                          ),
-                                        ],
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'Stories',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium
-                                              ?.copyWith(color: primaryText),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        ...infoUnlockDatas.map<Widget>((info) {
-                                          final infoMap = info as Map?;
-                                          final storyName =
-                                              infoMap?['storyName']
-                                                  as String? ??
-                                              '';
-                                          final tag =
-                                              infoMap?['avgTag'] as String?;
-                                          final storyCode =
-                                              infoMap?['storyCode'] as String?;
-                                          final storyTxt = infoMap?['storyTxt']
-                                              ?.toString();
-                                          final storyDesc =
-                                              (infoMap?['storyDesc'] ?? '')
-                                                  .toString()
-                                                  .trim();
-                                          final bool hasStoryTxt =
-                                              storyTxt != null &&
-                                              storyTxt.isNotEmpty;
-
-                                          return GestureDetector(
-                                            onTap: hasStoryTxt
-                                                ? () => _openStory(
-                                                    storyTxt: storyTxt,
-                                                    storyName: storyName,
-                                                    storyCode: storyCode,
-                                                    storyTag: tag,
-                                                  )
-                                                : null,
-                                            behavior: HitTestBehavior.opaque,
-                                            child: Container(
-                                              margin: const EdgeInsets.only(
-                                                bottom: 8,
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 10,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withValues(
-                                                  alpha: 0.5,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                                border: Border.all(
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.12),
-                                                ),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            Text(
-                                                              storyName,
-                                                              style: TextStyle(
-                                                                color:
-                                                                    primaryText,
-                                                                fontSize:
-                                                                    titleSize,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                              ),
-                                                            ),
-                                                            if (storyCode !=
-                                                                null)
-                                                              Text(
-                                                                storyCode,
-                                                                style: TextStyle(
-                                                                  color:
-                                                                      secondaryText,
-                                                                  fontSize:
-                                                                      codeSize,
-                                                                ),
-                                                              ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                      if (tag != null)
-                                                        Container(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 4,
-                                                              ),
-                                                          decoration: BoxDecoration(
-                                                            color: Colors.white
-                                                                .withValues(
-                                                                  alpha: 0.1,
-                                                                ),
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  8,
-                                                                ),
-                                                          ),
-                                                          child: Text(
-                                                            tag,
-                                                            style: TextStyle(
-                                                              color:
-                                                                  secondaryText,
-                                                              fontSize:
-                                                                  codeSize,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                  if (storyDesc.isNotEmpty) ...[
-                                                    const SizedBox(height: 8),
-                                                    Text(
-                                                      storyDesc,
-                                                      style: TextStyle(
-                                                        color: secondaryText,
-                                                        fontSize: descSize,
-                                                        height: 1.4,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        }),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              : const SizedBox.shrink(
-                                  key: ValueKey('story-empty'),
-                                ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-          if (showError && !hasData)
-            Center(
-              child: Text(
-                _error ?? 'Failed to load story',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ),
-          _buildBackButton(),
-          _buildVolumeButton(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVolumeButton() {
-    return Positioned(
-      top: 12,
-      right: 12,
-      child: SafeArea(
-        child: ValueListenableBuilder<bool>(
-          valueListenable: audio.soundEnabled,
-          builder: (context, enabled, _) {
-            return DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: IconButton(
-                icon: Icon(
-                  enabled ? Icons.volume_up : Icons.volume_off,
-                  color: Colors.white,
-                ),
-                onPressed: () async {
-                  await audio.toggleEnabled();
-                  if (mounted) setState(() {});
-                },
-                tooltip: enabled ? 'Mute' : 'Unmute',
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
+            Positioned(top: 0, left: 0, right: 0, child: _controls()),
+          ],
+        );
+      },
+    ),
+  );
 }

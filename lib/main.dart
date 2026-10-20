@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'utils/audio_manager.dart';
 import 'config/story_themes.dart';
+import 'config/archive_style.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,7 @@ class ArknightsStoryApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'ArkStory',
-      theme: ThemeData.dark(),
+      theme: ArchiveStyle.theme,
       home: const HomePage(),
     );
   }

@@ -1,187 +1,145 @@
-import 'package:arknights_story_app/config/database.dart';
 import 'package:flutter/material.dart';
-import 'story_entry.dart';
-import '../pages/story_review.dart';
+
+import '../config/archive_style.dart';
+import '../config/database.dart';
+import '../config/story_catalog.dart';
 import '../config/story_themes.dart';
+import '../pages/story_review.dart';
+import 'story_entry.dart';
 
-enum StoryTypeFilter { all, main, activity, mini }
+export '../config/story_catalog.dart' show StoryTypeFilter;
 
-class StoryDashboard extends StatelessWidget {
-  final Future<dynamic> storyMetaTableFuture;
-  final StoryTypeFilter filter;
+class StoryDashboard extends StatefulWidget {
   const StoryDashboard({
     super.key,
     required this.storyMetaTableFuture,
     this.filter = StoryTypeFilter.all,
+    this.query = '',
+    this.onStoryClosed,
   });
+  final Future<dynamic> storyMetaTableFuture;
+  final StoryTypeFilter filter;
+  final String query;
+  final VoidCallback? onStoryClosed;
 
-  void onEntryTap(BuildContext context, String id, String? titleImageId) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            StoryReviewPage(storyId: id, titleImageId: titleImageId),
-      ),
-    );
+  @override
+  State<StoryDashboard> createState() => _StoryDashboardState();
+}
+
+class _StoryDashboardState extends State<StoryDashboard> {
+  final _scroll = ScrollController();
+
+  @override
+  void didUpdateWidget(StoryDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filter != widget.filter || oldWidget.query != widget.query) {
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+    }
   }
 
-  StoryEntry _buildEntry(
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Widget _entry(
     BuildContext context,
     String id,
     Map story,
-    double width,
     double height,
+    double maxWidth,
   ) {
     final theme = StoryThemes.forStory(id, metadata: story);
-    final kvId = story['kvImageId'] as String?;
-    final titleId = story['titleImageId'] as String?;
+    final kv = story['kvImageId'] as String?;
+    final title = story['titleImageId'] as String?;
     final coverUrl =
         theme?.coverUrl ??
-        (kvId == null
-            ? null
-            : Database.reviewAssetURL(Database.kvImagePath, kvId));
-    final brandedCover = theme?.coverContainsTitle ?? false;
-    final titleUrl = brandedCover || story['type'] == 'MAIN_STORY'
+        (kv == null ? null : Database.reviewAssetURL(Database.kvImagePath, kv));
+    final main = story['type'] == 'MAIN_STORY';
+    final branded =
+        theme?.coverContainsTitle ?? story['coverContainsTitle'] == true;
+    final titleUrl = main || branded
         ? null
         : theme?.titleUrl ??
-              (titleId == null
+              (title == null
                   ? null
-                  : Database.reviewAssetURL(Database.titleImagePath, titleId));
+                  : Database.reviewAssetURL(Database.titleImagePath, title));
     return StoryEntry(
-      name: story['name'] as String,
+      key: ValueKey(id),
+      name: story['name'] as String? ?? id,
       kvImage: coverUrl == null ? null : NetworkImage(coverUrl),
       titleImage: titleUrl == null ? null : NetworkImage(titleUrl),
-      coverContainsTitle: brandedCover,
-      width: width,
       height: height,
-      onTap: () => onEntryTap(context, id, titleId),
+      maxWidth: maxWidth,
+      aspectRatio:
+          (story['coverAspectRatio'] as num?)?.toDouble() ??
+          (main
+              ? 1
+              : branded
+              ? 2
+              : 632 / 456),
+      onTap: () async {
+        await Navigator.of(context).push(
+          archiveRoute(
+            context,
+            (_) => StoryReviewPage(storyId: id, titleImageId: title),
+          ),
+        );
+        if (mounted) widget.onStoryClosed?.call();
+      },
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<dynamic>(
-      future: storyMetaTableFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final table = snapshot.data;
-        if (table == null) {
-          return const Center(child: Text('Failed to load stories'));
-        }
-        final ids = _filteredAndSortedIds(table, filter);
-        return SingleChildScrollView(
-          child: SizedBox(
-            width: MediaQuery.of(context).size.width,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                const double spacing = 16;
-                const double padding = 16;
-                const int minPerRow = 3;
-                final double available = (constraints.maxWidth - padding * 2)
-                    .clamp(0, double.infinity);
-                final double rawTargetWidth =
-                    (available - spacing * (minPerRow - 1)) / minPerRow;
-                final double cardWidth = rawTargetWidth <= 0
-                    ? 120
-                    : (rawTargetWidth > 250 ? 250 : rawTargetWidth);
-                final bool isCompact = cardWidth < 220;
-                final double cardHeight = isCompact
-                    ? cardWidth * 1.8
-                    : cardWidth * 1.2;
-                final int columns =
-                    ((available + spacing) / (cardWidth + spacing))
-                        .floor()
-                        .clamp(1, 12);
-                final int effectiveColumns = columns < minPerRow
-                    ? minPerRow
-                    : columns;
-                final double contentWidth =
-                    effectiveColumns * (cardWidth + spacing) - spacing;
-
-                return Padding(
-                  padding: const EdgeInsets.all(padding),
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: SizedBox(
-                      width: contentWidth,
-                      child: Wrap(
-                        alignment: WrapAlignment.start,
-                        runAlignment: WrapAlignment.start,
-                        spacing: spacing,
-                        runSpacing: spacing,
-                        children: [
-                          for (final id in ids)
-                            _buildEntry(
-                              context,
-                              id.toString(),
-                              table[id] as Map,
-                              cardWidth,
-                              cardHeight,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+  Widget build(BuildContext context) => FutureBuilder<dynamic>(
+    future: widget.storyMetaTableFuture,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      }
+      final table = snapshot.data;
+      if (table is! Map) return const Center(child: Text('故事加载失败，请稍后重试'));
+      final ids = storyCatalogIds(table, widget.filter, query: widget.query);
+      if (ids.isEmpty) {
+        return const Center(
+          child: Text('没有匹配的故事', style: TextStyle(color: ArchiveStyle.muted)),
         );
-      },
-    );
-  }
-}
-
-List<dynamic> _filteredAndSortedIds(
-  Map<dynamic, dynamic> table,
-  StoryTypeFilter filter,
-) {
-  final filtered = table.keys.where((id) {
-    final type = table[id]?['type']?.toString() ?? '';
-    switch (filter) {
-      case StoryTypeFilter.main:
-        return type == 'MAIN_STORY';
-      case StoryTypeFilter.activity:
-        return type == 'ACTIVITY_STORY';
-      case StoryTypeFilter.mini:
-        return type == 'MINI_STORY';
-      case StoryTypeFilter.all:
-        return true;
-    }
-  }).toList();
-
-  filtered.sort((a, b) {
-    int safeYear(dynamic v) {
-      final raw = v?.toString() ?? '';
-      if (raw.contains('-')) {
-        final parts = raw.split('-');
-        if (parts.isNotEmpty) {
-          return int.tryParse(parts[0]) ?? 0;
-        }
       }
-      return int.tryParse(raw) ?? 0;
-    }
-
-    int safeMonth(dynamic v) {
-      final raw = v?.toString() ?? '';
-      if (raw.contains('-')) {
-        final parts = raw.split('-');
-        if (parts.length > 1) {
-          return int.tryParse(parts[1]) ?? 1;
-        }
-      }
-      return 1;
-    }
-
-    final ayyyy = safeYear(table[a]?['startTime']);
-    final amm = safeMonth(table[a]?['startTime']);
-    final byyyy = safeYear(table[b]?['startTime']);
-    final bmm = safeMonth(table[b]?['startTime']);
-    final aTime = DateTime(ayyyy, amm);
-    final bTime = DateTime(byyyy, bmm);
-    return bTime.compareTo(aTime); // newest first
-  });
-
-  return filtered;
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 600;
+          final padding = compact ? 18.0 : 28.0;
+          final height = compact
+              ? 144.0
+              : (constraints.maxWidth * 0.17).clamp(180.0, 260.0);
+          return Scrollbar(
+            controller: _scroll,
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: EdgeInsets.fromLTRB(padding, 8, padding, 28),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Wrap(
+                  spacing: compact ? 10 : 12,
+                  runSpacing: compact ? 14 : 16,
+                  crossAxisAlignment: WrapCrossAlignment.end,
+                  children: [
+                    for (final id in ids)
+                      _entry(
+                        context,
+                        id,
+                        table[id] as Map,
+                        height,
+                        constraints.maxWidth - padding * 2,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
 }

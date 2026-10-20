@@ -3,13 +3,15 @@ import 'dart:developer';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import '../config/config.dart';
+import 'audio_backend_native.dart'
+    if (dart.library.js_interop) 'audio_backend_web.dart';
 
 final audio = AudioManager();
 
 class AudioManager {
-  final AudioPlayer _intro = AudioPlayer();
-  final AudioPlayer _loop = AudioPlayer();
-  final AudioPlayer _sfx = AudioPlayer();
+  final AppAudioPlayer _intro = AppAudioPlayer();
+  final AppAudioPlayer _loop = AppAudioPlayer();
+  final AppAudioPlayer _sfx = AppAudioPlayer();
 
   double _masterVolume = 1.0;
   int _musicGeneration = 0;
@@ -81,6 +83,7 @@ class AudioManager {
     // Play intro, then start loop immediately after completion
     if (introReady) {
       final playedIntro = await _resumeSafely(_intro);
+      if (generation != _musicGeneration) return;
       if (!playedIntro) {
         await _resumeSafely(_loop);
         return;
@@ -106,9 +109,9 @@ class AudioManager {
 
   Future<void> stop() async {
     _musicGeneration++;
-    await _intro.stop();
-    await _loop.stop();
-    await _sfx.stop();
+    // Issue every stop before yielding, so a page being disposed cannot later
+    // stop the next page's loop after its intro has already started.
+    await Future.wait([_intro.stop(), _loop.stop(), _sfx.stop()]);
   }
 
   Future<void> setVolume(double volume) async {
@@ -133,7 +136,7 @@ class AudioManager {
     await _sfx.setVolume(effective);
   }
 
-  Future<bool> _setSourceSafely(AudioPlayer player, String? url) async {
+  Future<bool> _setSourceSafely(AppAudioPlayer player, String? url) async {
     if (url == null || url.isEmpty) return false;
 
     try {
@@ -149,7 +152,7 @@ class AudioManager {
     }
   }
 
-  Future<bool> _resumeSafely(AudioPlayer player) async {
+  Future<bool> _resumeSafely(AppAudioPlayer player) async {
     try {
       await player.resume();
       return true;
