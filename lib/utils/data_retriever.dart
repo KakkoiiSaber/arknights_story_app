@@ -9,7 +9,9 @@ class DataRetriever {
     try {
       final bundled = await reviewAssets.json(url);
       if (bundled != null) return bundled;
-      final response = await http.get(Uri.parse(url));
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 25));
       if (response.statusCode != 200) {
         debugPrint("HTTP ${response.statusCode} for $url");
         return null;
