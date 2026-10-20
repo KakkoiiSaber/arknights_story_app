@@ -4,8 +4,9 @@ import '../downloads/download_task.dart' show downloadSize;
 import '../utils/audio_manager.dart';
 
 class ReviewDownloadPanel extends StatelessWidget {
-  const ReviewDownloadPanel({super.key, this.compact = false});
+  const ReviewDownloadPanel({super.key, this.compact = false, this.onRetry});
   final bool compact;
+  final VoidCallback? onRetry;
   @override
   Widget build(BuildContext context) {
     if (!reviewAssets.supported) return const SizedBox.shrink();
@@ -19,25 +20,61 @@ class ReviewDownloadPanel extends StatelessWidget {
           }
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    service.error != null
-                        ? '资源更新暂未完成，可在设置中重试'
-                        : service.checking
-                        ? '正在检查故事资源更新…'
-                        : '正在下载${service.selection == 'all' ? '主题资源' : '首页素材'} ${(service.progress * 100).round()}%',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        service.error != null
+                            ? '资源更新暂未完成，可在设置中重试'
+                            : service.checking
+                            ? service.catalogProgress == null
+                                  ? '正在获取故事资源清单…'
+                                  : '正在下载故事目录 ${(service.catalogProgress! * 100).round()}% · ${downloadSize(service.catalogDownloadedBytes)} / ${downloadSize(service.catalogTotalBytes)}'
+                            : '正在下载${service.selection == 'all' ? '主题资源' : '首页素材'} ${(service.progress * 100).round()}%',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                    if (service.running)
+                      IconButton(
+                        iconSize: 18,
+                        tooltip: '暂停资源下载',
+                        onPressed: service.pause,
+                        icon: const Icon(Icons.pause),
+                      ),
+                    if (service.error != null)
+                      TextButton(
+                        onPressed: service.checking || service.running
+                            ? null
+                            : () async {
+                                await service.checkForUpdates();
+                                onRetry?.call();
+                                if (!service.running &&
+                                    service.revision != null) {
+                                  await service.start(
+                                    service.selection ?? 'home',
+                                  );
+                                }
+                              },
+                        child: const Text('重试'),
+                      ),
+                  ],
                 ),
-                if (service.running)
-                  IconButton(
-                    iconSize: 18,
-                    tooltip: '暂停资源下载',
-                    onPressed: service.pause,
-                    icon: const Icon(Icons.pause),
+                if (service.checking || service.running) ...[
+                  const SizedBox(height: 6),
+                  LinearProgressIndicator(
+                    value: service.checking
+                        ? service.catalogProgress
+                        : service.progress,
+                    minHeight: 2,
                   ),
+                  const SizedBox(height: 6),
+                ],
               ],
             ),
           );
