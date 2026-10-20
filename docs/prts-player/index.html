@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>剧情阅读</title>
+  <script type="module" crossorigin src="./assets/player-RFdghsmA.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/native-delivery-AKsa6eeX.js">
+  <link rel="stylesheet" crossorigin href="./assets/player-DYCv6NXE.css">
+</head>
+<body>
+  <main>
+    <div id="stage" tabindex="0" role="button" aria-label="剧情画面，点击或按空格推进"></div>
+    <div id="overlay"><div class="card"><h2 id="heading">加载中…</h2><p id="status" role="status">正在准备剧情…</p><progress id="progress" max="1" value="0"></progress><button id="retry" hidden>重试</button><p id="hint">点击画面或按空格推进</p></div></div>
+    <nav id="hud" aria-label="阅读控制">
+      <button id="return" aria-label="返回故事页" title="返回故事页">←</button>
+      <div class="actions">
+        <button id="log" disabled>记录</button>
+        <button id="auto" disabled aria-pressed="false">自动</button>
+        <button id="quick" disabled aria-pressed="false">快进</button>
+        <button id="speed" hidden aria-label="播放速度">1 档</button>
+        <button id="settings" aria-label="阅读设置" title="阅读设置">⚙</button>
+        <button id="restart" disabled aria-label="重新阅读" title="重新阅读">↻</button>
+      </div>
+    </nav>
+  </main>
+  <dialog id="log-panel" aria-labelledby="log-title">
+    <div class="panel-heading"><h2 id="log-title">剧情记录</h2><button data-close aria-label="关闭记录">×</button></div>
+    <div id="log-content" class="panel-content"></div>
+  </dialog>
+  <dialog id="settings-panel" aria-labelledby="settings-title">
+    <div class="panel-heading"><h2 id="settings-title">阅读设置</h2><button data-close aria-label="关闭设置">×</button></div>
+    <form class="panel-content" onsubmit="return false">
+      <label for="doctor-name">博士名称</label><input id="doctor-name" type="text" maxlength="32" placeholder="博士" autocomplete="off">
+      <label for="font-scale">文字字号 <output id="font-value"></output></label><input id="font-scale" type="range" min="80" max="140" step="10">
+      <label for="typing-speed">文字显示速度 <output id="typing-value"></output></label><input id="typing-speed" type="range" min="0" max="100" step="5">
+      <p id="settings-note" role="status">应用于所有剧情</p>
+    </form>
+  </dialog>
+</body>
+</html>

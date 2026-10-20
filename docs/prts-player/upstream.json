@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/MooncellWiki/prts-widgets",
+  "revision": "97d35ebedcd70d56b14d9ef05238a88460d97cf4",
+  "fonts": [
+    "NotoSansHans-Medium.woff2",
+    "FZTYSK--GBK1-0.woff2",
+    "RoHMinSinkStd-UB.woff2",
+    "SourceHanSansCN-Heavy.woff2"
+  ],
+  "hostProtocol": 1
+}
