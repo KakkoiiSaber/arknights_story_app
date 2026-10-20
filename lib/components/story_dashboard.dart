@@ -17,11 +17,13 @@ class StoryDashboard extends StatefulWidget {
     this.filter = StoryTypeFilter.all,
     this.query = '',
     this.onStoryClosed,
+    this.onRetry,
   });
   final Future<dynamic> storyMetaTableFuture;
   final StoryTypeFilter filter;
   final String query;
   final VoidCallback? onStoryClosed;
+  final VoidCallback? onRetry;
 
   @override
   State<StoryDashboard> createState() => _StoryDashboardState();
@@ -97,10 +99,34 @@ class _StoryDashboardState extends State<StoryDashboard> {
     future: widget.storyMetaTableFuture,
     builder: (context, snapshot) {
       if (snapshot.connectionState != ConnectionState.done) {
-        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+        return const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(strokeWidth: 2),
+              SizedBox(height: 16),
+              Text('正在加载故事目录…', style: TextStyle(color: ArchiveStyle.muted)),
+            ],
+          ),
+        );
       }
       final table = snapshot.data;
-      if (table is! Map) return const Center(child: Text('故事加载失败，请稍后重试'));
+      if (table is! Map) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('故事目录加载失败，请检查网络后重试'),
+              if (widget.onRetry != null)
+                TextButton.icon(
+                  onPressed: widget.onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('重试加载'),
+                ),
+            ],
+          ),
+        );
+      }
       final ids = storyCatalogIds(table, widget.filter, query: widget.query);
       if (ids.isEmpty) {
         return const Center(

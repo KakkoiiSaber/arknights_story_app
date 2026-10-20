@@ -18,7 +18,7 @@ void main() {
   const cover = 'https://example.com/cover.png';
   const background = 'https://example.com/background.png';
   late String base;
-  bool failMetadata = false, slow = false;
+  bool failMetadata = false, slow = false, slowMetadata = false;
   Completer<void>? gate;
 
   Map<String, dynamic> resource(String path, String role) => {
@@ -47,6 +47,7 @@ void main() {
     };
     failMetadata = false;
     slow = false;
+    slowMetadata = false;
     gate = null;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     base = 'http://127.0.0.1:${server.port}';
@@ -71,7 +72,9 @@ void main() {
           request.response.add(utf8.encode('bad'));
         } else {
           final bytes = bodies[path]!;
-          if (slow && path == '/background') {
+          if ((slow && path == '/background') ||
+              (slowMetadata && path == '/meta')) {
+            request.response.bufferOutput = false;
             request.response.add(bytes.take(3).toList());
             await request.response.flush();
             await gate!.future;
@@ -98,6 +101,30 @@ void main() {
     );
     await root.delete(recursive: true);
   });
+
+  test(
+    'first catalog download reports bytes before catalog is installed',
+    () async {
+      slowMetadata = true;
+      gate = Completer<void>();
+      final update = cache.checkForUpdates();
+      for (var i = 0; i < 100 && cache.catalogDownloadedBytes == 0; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(cache.revision, isNull);
+      expect(cache.checking, isTrue);
+      expect(cache.catalogTotalBytes, bodies['/meta']!.length);
+      expect(cache.catalogDownloadedBytes, 3);
+      expect(cache.catalogProgress, greaterThan(0));
+      expect(cache.catalogProgress, lessThan(1));
+      gate!.complete();
+      gate = null;
+      await update;
+      expect(cache.revision, 'version-one');
+      expect(cache.checking, isFalse);
+      await settled();
+    },
+  );
 
   test(
     'first launch saves the catalog and covers, and loads theme media only on demand',

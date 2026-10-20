@@ -49,6 +49,17 @@ class ReviewCache extends ChangeNotifier {
   int _active = 0, _batchGeneration = 0;
   bool _closed = false;
   Future<void>? _updating;
+  Map<String, ReviewResource> _catalogDownloads = {};
+  int get catalogTotalBytes =>
+      _catalogDownloads.values.fold(0, (sum, r) => sum + r.bytes);
+  int get catalogDownloadedBytes => _catalogDownloads.values.fold(
+    0,
+    (sum, r) =>
+        sum + (_cached.contains(r.key) ? r.bytes : (_jobs[r.key]?.loaded ?? 0)),
+  );
+  double? get catalogProgress => catalogTotalBytes == 0
+      ? null
+      : (catalogDownloadedBytes / catalogTotalBytes).clamp(0, 1);
   Future<void> _writes = Future.value();
   Directory get files => Directory('${root.path}/files');
   File get _manifestFile => File('${root.path}/manifest.json');
@@ -172,10 +183,15 @@ class ReviewCache extends ChangeNotifier {
       if (data['revision'] != revision) {
         // Stage the new catalog first; a failed update leaves the prior
         // manifest and its metadata usable together offline.
+        _catalogDownloads = {
+          for (final r in incoming.values.where(
+            (r) => r.roles.contains('metadata'),
+          ))
+            r.key: r,
+        };
+        notifyListeners();
         await Future.wait(
-          incoming.values
-              .where((r) => r.roles.contains('metadata'))
-              .map((r) => _ensureResource(r)),
+          _catalogDownloads.values.map((r) => _ensureResource(r)),
         );
         final resume = running ? selection : null;
         await pause();
@@ -196,6 +212,7 @@ class ReviewCache extends ChangeNotifier {
       updateError = '检查资源更新失败：$e';
     } finally {
       checking = false;
+      _catalogDownloads = {};
       notifyListeners();
     }
   }
@@ -361,7 +378,7 @@ class ReviewCache extends ChangeNotifier {
           );
         }
         sink = part.openWrite();
-        var notified = DateTime.now();
+        var notified = DateTime.fromMillisecondsSinceEpoch(0);
         job.iterator = StreamIterator(
           response.timeout(const Duration(seconds: 30)),
         );
