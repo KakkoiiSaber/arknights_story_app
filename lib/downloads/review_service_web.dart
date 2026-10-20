@@ -9,6 +9,9 @@ class ReviewAssetService extends ChangeNotifier {
   String? get revision => null;
   String? get error => null;
   bool get checking => false;
+  double? get catalogProgress => null;
+  int get catalogDownloadedBytes => 0;
+  int get catalogTotalBytes => 0;
   bool get running => false;
   bool get clearing => false;
   String get state => 'idle';
