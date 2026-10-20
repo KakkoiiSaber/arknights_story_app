@@ -2,6 +2,7 @@ import 'package:arknights_story_app/config/database.dart';
 import 'package:flutter/material.dart';
 import 'story_entry.dart';
 import '../pages/story_review.dart';
+import '../config/story_themes.dart';
 
 enum StoryTypeFilter { all, main, activity, mini }
 
@@ -15,15 +16,44 @@ class StoryDashboard extends StatelessWidget {
   });
 
   void onEntryTap(BuildContext context, String id, String? titleImageId) {
-    Navigator.of(
-      context,
-    ).push(
+    Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => StoryReviewPage(
-          storyId: id,
-          titleImageId: titleImageId,
-        ),
+        builder: (_) =>
+            StoryReviewPage(storyId: id, titleImageId: titleImageId),
       ),
+    );
+  }
+
+  StoryEntry _buildEntry(
+    BuildContext context,
+    String id,
+    Map story,
+    double width,
+    double height,
+  ) {
+    final theme = StoryThemes.forStory(id, metadata: story);
+    final kvId = story['kvImageId'] as String?;
+    final titleId = story['titleImageId'] as String?;
+    final coverUrl =
+        theme?.coverUrl ??
+        (kvId == null
+            ? null
+            : Database.reviewAssetURL(Database.kvImagePath, kvId));
+    final brandedCover = theme?.coverContainsTitle ?? false;
+    final titleUrl = brandedCover || story['type'] == 'MAIN_STORY'
+        ? null
+        : theme?.titleUrl ??
+              (titleId == null
+                  ? null
+                  : Database.reviewAssetURL(Database.titleImagePath, titleId));
+    return StoryEntry(
+      name: story['name'] as String,
+      kvImage: coverUrl == null ? null : NetworkImage(coverUrl),
+      titleImage: titleUrl == null ? null : NetworkImage(titleUrl),
+      coverContainsTitle: brandedCover,
+      width: width,
+      height: height,
+      onTap: () => onEntryTap(context, id, titleId),
     );
   }
 
@@ -82,31 +112,12 @@ class StoryDashboard extends StatelessWidget {
                         runSpacing: spacing,
                         children: [
                           for (final id in ids)
-                            StoryEntry(
-                              name: table[id]['name'],
-                              kvImage: table[id]['kvImageId'] != null
-                                  ? NetworkImage(
-                                      Database.kvImagePath +
-                                          table[id]['kvImageId'],
-                                    )
-                                  : null,
-                              titleImage: table[id]['type'] != "MAIN_STORY"
-                                  ? (table[id]['titleImageId'] != null
-                                        ? NetworkImage(
-                                            Database.titleImagePath +
-                                                table[id]['titleImageId'],
-                                          )
-                                        : null)
-                                  : null,
-                              width: cardWidth,
-                              height: cardHeight,
-                              onTap: () {
-                                onEntryTap(
-                                  context,
-                                  id.toString(),
-                                  table[id]['titleImageId']?.toString(),
-                                );
-                              },
+                            _buildEntry(
+                              context,
+                              id.toString(),
+                              table[id] as Map,
+                              cardWidth,
+                              cardHeight,
                             ),
                         ],
                       ),

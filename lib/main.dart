@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'utils/audio_manager.dart';
+import 'config/story_themes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await audio.init();
+  await StoryThemes.load();
   runApp(const ArknightsStoryApp());
 }
 

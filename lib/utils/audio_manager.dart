@@ -12,8 +12,10 @@ class AudioManager {
   final AudioPlayer _sfx = AudioPlayer();
 
   double _masterVolume = 1.0;
-  final ValueNotifier<bool> soundEnabled =
-      ValueNotifier<bool>(Config.isSoundEnabled);
+  int _musicGeneration = 0;
+  final ValueNotifier<bool> soundEnabled = ValueNotifier<bool>(
+    Config.isSoundEnabled,
+  );
 
   Future<void> init() async {
     await _intro.setReleaseMode(ReleaseMode.stop);
@@ -43,7 +45,9 @@ class AudioManager {
 
   // play looped music
   Future<void> loop(String? url) async {
+    final generation = ++_musicGeneration;
     if (!await _setSourceSafely(_loop, url)) return;
+    if (generation != _musicGeneration) return;
     await _resumeSafely(_loop);
   }
 
@@ -65,8 +69,11 @@ class AudioManager {
       playSoundSingle(url, volume: volume);
 
   Future<void> intro2loop(String? introURL, String? loopURL) async {
+    final generation = ++_musicGeneration;
     final introReady = await _setSourceSafely(_intro, introURL);
+    if (generation != _musicGeneration) return;
     final loopReady = await _setSourceSafely(_loop, loopURL);
+    if (generation != _musicGeneration) return;
 
     // If the loop track fails to load, don't start playback to avoid errors.
     if (!loopReady) return;
@@ -78,12 +85,18 @@ class AudioManager {
         await _resumeSafely(_loop);
         return;
       }
-      _intro.onPlayerComplete.first.then((_) async {
-        await _resumeSafely(_loop);
-      }).catchError((Object e, StackTrace st) {
-        log('Audio onPlayerComplete -> loop failed: $e',
-            stackTrace: st, name: 'AudioManager');
-      });
+      _intro.onPlayerComplete.first
+          .then((_) async {
+            if (generation != _musicGeneration) return;
+            await _resumeSafely(_loop);
+          })
+          .catchError((Object e, StackTrace st) {
+            log(
+              'Audio onPlayerComplete -> loop failed: $e',
+              stackTrace: st,
+              name: 'AudioManager',
+            );
+          });
       return;
     }
 
@@ -92,6 +105,7 @@ class AudioManager {
   }
 
   Future<void> stop() async {
+    _musicGeneration++;
     await _intro.stop();
     await _loop.stop();
     await _sfx.stop();
@@ -126,8 +140,11 @@ class AudioManager {
       await player.setSource(UrlSource(url));
       return true;
     } catch (e, st) {
-      log('Audio setSource failed for $url: $e',
-          stackTrace: st, name: 'AudioManager');
+      log(
+        'Audio setSource failed for $url: $e',
+        stackTrace: st,
+        name: 'AudioManager',
+      );
       return false;
     }
   }
@@ -137,8 +154,7 @@ class AudioManager {
       await player.resume();
       return true;
     } catch (e, st) {
-      log('Audio resume failed: $e',
-          stackTrace: st, name: 'AudioManager');
+      log('Audio resume failed: $e', stackTrace: st, name: 'AudioManager');
       return false;
     }
   }

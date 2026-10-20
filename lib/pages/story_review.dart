@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../config/database.dart';
 import '../config/config.dart';
+import '../config/story_themes.dart';
+import '../components/story_background.dart';
 import '../utils/audio_manager.dart';
 import '../utils/data_retriever.dart';
 import 'story.dart';
@@ -28,16 +29,16 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   bool _loading = true;
   String? _error;
   bool _bgLoaded = false;
-  bool _bgReady = false;
-  ImageProvider? _bgProvider;
-  bool _titleReady = false;
+  List<String> _backgroundUrls = const [];
+  List<ImageProvider> _bgProviders = const [];
+  bool _readingStory = false;
   ImageProvider? _titleProvider;
-  String? _titleId;
+  StoryThemeAssets? get _theme =>
+      StoryThemes.forStory(widget.storyId, metadata: _story);
 
   String? get id => _story?['id'] as String?;
   String? get name => _story?['name'] as String?;
   String? get desc => _story?['desc'] as String?;
-  String? get backgroundId => _story?['backgroundId'] as String?;
   String? get gameMusicName => _story?['gameMusicName'] as String?;
   List<dynamic> get infoUnlockDatas =>
       (_story?['infoUnlockDatas'] as List<dynamic>?) ?? const [];
@@ -45,7 +46,6 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   @override
   void initState() {
     super.initState();
-    _stopAllAudio();
     _loadStory();
   }
 
@@ -59,6 +59,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     String? storyCode,
     String? storyTag,
   }) async {
+    _readingStory = true;
     await _stopAllAudio();
     if (!mounted) return;
     await Navigator.of(context).push(
@@ -71,36 +72,51 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         ),
       ),
     );
+    _readingStory = false;
     if (mounted) await _playBgMusic(gameMusicName);
   }
 
   Future<void> _loadStory() async {
+    await _stopAllAudio();
+    if (!mounted) return;
     final url = '${Database.reviewInfoPath}${widget.storyId}.json';
     try {
       final fetched = await DataRetriever.getJsonFromURL(url);
       if (fetched is! Map) throw Exception('Invalid story data');
-      final story = Map<String, dynamic>.from(fetched as Map);
+      final story = Map<String, dynamic>.from(fetched);
+      final theme = StoryThemes.forStory(widget.storyId, metadata: story);
       final bgId = story['backgroundId']?.toString();
       final musicKey = story['gameMusicName']?.toString();
-      final titleId =
-          widget.titleImageId ?? story['titleImageId']?.toString();
+      final titleId = widget.titleImageId ?? story['titleImageId']?.toString();
+      final backgroundUrls =
+          theme?.backgroundUrls ??
+          [
+            if (bgId != null && bgId.isNotEmpty)
+              Database.reviewAssetURL(Database.backgroundPath, bgId),
+          ];
+      final titleUrl =
+          theme?.titleUrl ??
+          (titleId == null || titleId.isEmpty
+              ? null
+              : Database.reviewAssetURL(Database.titleImagePath, titleId));
 
       if (mounted) {
         setState(() {
           _story = story;
           _loading = false;
           _bgLoaded = false;
-          _bgReady = bgId == null || bgId.isEmpty;
-          _bgProvider = null;
-          _titleReady = titleId == null || titleId.isEmpty;
+          _backgroundUrls = backgroundUrls;
+          _bgProviders = const [];
           _titleProvider = null;
-          _titleId = titleId;
         });
       }
 
-      await _preloadBackground(bgId);
-      await _preloadTitleImage(titleId);
-      await _playBgMusic(musicKey);
+      // Artwork and audio prepare independently; the chapter list is usable immediately.
+      await Future.wait([
+        _preloadBackground(backgroundUrls),
+        _preloadTitleImage(titleUrl),
+        _playBgMusic(musicKey),
+      ]);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -110,102 +126,62 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     }
   }
 
-  Future<void> _preloadBackground(String? bgId) async {
-    if (bgId == null || bgId.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _bgReady = true;
-          _bgLoaded = false;
-          _bgProvider = null;
-        });
-      }
-      return;
-    }
-
-    final url = Database.backgroundPath + bgId;
-
-    // Quick check to avoid long hangs on missing assets.
+  Future<bool> _precache(ImageProvider provider) async {
+    if (!mounted) return false;
+    var succeeded = true;
     try {
-      final res = await http.get(Uri.parse(url)).timeout(
-        const Duration(seconds: 6),
-      );
-      if (res.statusCode != 200) {
-        if (!mounted) return;
-        setState(() {
-          _bgLoaded = false;
-          _bgReady = true;
-          _bgProvider = null;
-        });
-        return;
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _bgLoaded = false;
-        _bgReady = true;
-        _bgProvider = null;
-      });
-      return;
-    }
-
-    final provider = NetworkImage(url);
-    try {
+      // Download/decode once through Flutter's shared image cache. In particular,
+      // don't GET a large background as a preliminary availability check.
       await precacheImage(
         provider,
         context,
-        onError: (_, __) {},
-      );
-      if (!mounted) return;
-      setState(() {
-        _bgLoaded = true;
-        _bgReady = true;
-        _bgProvider = provider;
-      });
+        onError: (_, _) {
+          succeeded = false;
+        },
+      ).timeout(const Duration(seconds: 30));
+      return succeeded;
     } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _bgLoaded = false;
-        _bgReady = true;
-        _bgProvider = null;
-      });
+      return false;
     }
   }
 
-  Future<void> _preloadTitleImage(String? titleId) async {
-    if (titleId == null || titleId.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _titleReady = true;
-          _titleProvider = null;
-        });
-      }
-      return;
-    }
+  Future<void> _preloadBackground(List<String> urls) async {
+    final providers = [for (final url in urls) NetworkImage(url)];
+    final loaded = await Future.wait(providers.map(_precache));
+    if (!mounted) return;
+    setState(() {
+      // A tiled background is one composition: don't display only half of it.
+      _bgLoaded = providers.isNotEmpty && loaded.every((value) => value);
+      _bgProviders = _bgLoaded ? providers : const [];
+    });
+  }
 
-    final provider = NetworkImage(Database.titleImagePath + titleId);
-    try {
-      await precacheImage(provider, context);
-      if (!mounted) return;
-      setState(() {
-        _titleReady = true;
-        _titleProvider = provider;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _titleReady = true;
-        _titleProvider = null;
-      });
-    }
+  Future<void> _preloadTitleImage(String? url) async {
+    if (url == null || url.isEmpty) return;
+    final provider = NetworkImage(url);
+    final loaded = await _precache(provider);
+    if (!mounted) return;
+    setState(() => _titleProvider = loaded ? provider : null);
   }
 
   Future<void> _playBgMusic(String? musicKey) async {
+    if (!mounted || _readingStory) return;
+    final theme = _theme;
+    if (theme != null) {
+      if (theme.musicIntroUrl != null) {
+        await audio.intro2loop(theme.musicIntroUrl, theme.musicLoopUrl);
+      } else {
+        await audio.loop(theme.musicLoopUrl);
+      }
+      return;
+    }
     if (musicKey == null) return;
 
     final audioTable = await DataRetriever.getJsonFromURL(
       Database.gameMusicDataPath,
     );
 
+    if (!mounted || _readingStory || audioTable is! Map) return;
     final trackInfo = audioTable[musicKey];
     if (trackInfo is! Map) return;
 
@@ -214,13 +190,15 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
     if (introPath == null && loopPath == null) return;
     if (introPath == null && loopPath != null) {
-      await audio.loop(Database.gameMusicPath + loopPath);
+      await audio.loop(
+        Database.reviewAssetURL(Database.gameMusicPath, loopPath),
+      );
       return;
     }
     if (introPath != null && loopPath != null) {
       await audio.intro2loop(
-        Database.gameMusicPath + introPath,
-        Database.gameMusicPath + loopPath,
+        Database.reviewAssetURL(Database.gameMusicPath, introPath),
+        Database.reviewAssetURL(Database.gameMusicPath, loopPath),
       );
       return;
     }
@@ -240,7 +218,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       child: SafeArea(
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.55),
+            color: Colors.black.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(22),
           ),
           child: IconButton(
@@ -256,14 +234,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   @override
   Widget build(BuildContext context) {
     final hasData = !_loading && _story != null;
-    final hasBackgroundId = hasData && (backgroundId?.isNotEmpty ?? false);
+    final hasBackgroundId = hasData && _backgroundUrls.isNotEmpty;
     final showBackgroundLayer = hasData && hasBackgroundId;
-    final hasTitle = hasData && (_titleId?.isNotEmpty ?? false);
     final showError = !_loading && _error != null;
-    final canShowContent =
-        hasData &&
-        (_bgReady || !hasBackgroundId) &&
-        (_titleReady || !hasTitle);
+    final canShowContent = hasData;
 
     return Scaffold(
       body: Stack(
@@ -271,20 +245,17 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
           if (showBackgroundLayer)
             Positioned.fill(
               child: AnimatedOpacity(
-                opacity: _bgLoaded && _bgReady ? 1 : 0,
+                opacity: _bgLoaded ? 1 : 0,
                 duration: widget.fadeDuration,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    if (_bgProvider != null)
-                      Image(
-                        image: _bgProvider!,
-                        fit: BoxFit.cover,
-                        // Bias view to ~30% from the left so important left-side art stays visible on narrow widths.
-                        alignment: const Alignment(-0.5, 0),
-                      ),
+                    StoryBackground(
+                      images: _bgProviders,
+                      aspectRatio: _theme?.backgroundAspectRatio ?? 16 / 9,
+                    ),
                     // Darken background for readability.
-                    Container(color: Colors.black.withOpacity(0.2)),
+                    Container(color: Colors.black.withValues(alpha: 0.2)),
                   ],
                 ),
               ),
@@ -297,7 +268,9 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                 right: 16,
                 // bottom: 16,
               ),
-              color: showBackgroundLayer ? Colors.black.withOpacity(0.25) : null,
+              color: showBackgroundLayer
+                  ? Colors.black.withValues(alpha: 0.25)
+                  : null,
               child: SafeArea(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -309,7 +282,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                     final titleSize = isWide ? 18.0 : 16.0;
                     final codeSize = isWide ? 13.0 : 12.0;
                     final descSize = isWide ? 15.0 : 14.0;
-                    final primaryText = Colors.white.withOpacity(0.92);
+                    final primaryText = Colors.white.withValues(alpha: 0.92);
                     final secondaryText = Colors.white70;
 
                     return Align(
@@ -331,7 +304,9 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                         if (_titleProvider != null)
                                           SizedBox(
                                             height: 150,
-                                            width: 200,
+                                            width: _theme?.titleIsBanner == true
+                                                ? 300
+                                                : 200,
                                             child: Image(
                                               image: _titleProvider!,
                                               fit: BoxFit.contain,
@@ -339,6 +314,13 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                           ),
                                         if (_titleProvider != null)
                                           const SizedBox(height: 8),
+                                        if (_titleProvider == null)
+                                          Text(
+                                            name ?? '',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.headlineSmall,
+                                          ),
                                         // Text(
                                         //   name ?? '',
                                         //   style: Theme.of(context)
@@ -380,44 +362,44 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                               infoMap?['avgTag'] as String?;
                                           final storyCode =
                                               infoMap?['storyCode'] as String?;
-                                          final storyTxt =
-                                              infoMap?['storyTxt']?.toString();
+                                          final storyTxt = infoMap?['storyTxt']
+                                              ?.toString();
                                           final storyDesc =
                                               (infoMap?['storyDesc'] ?? '')
                                                   .toString()
                                                   .trim();
                                           final bool hasStoryTxt =
                                               storyTxt != null &&
-                                                  storyTxt.isNotEmpty;
+                                              storyTxt.isNotEmpty;
 
                                           return GestureDetector(
                                             onTap: hasStoryTxt
                                                 ? () => _openStory(
-                                                      storyTxt: storyTxt!,
-                                                      storyName: storyName,
-                                                      storyCode: storyCode,
-                                                      storyTag: tag,
-                                                    )
+                                                    storyTxt: storyTxt,
+                                                    storyName: storyName,
+                                                    storyCode: storyCode,
+                                                    storyTag: tag,
+                                                  )
                                                 : null,
                                             behavior: HitTestBehavior.opaque,
                                             child: Container(
                                               margin: const EdgeInsets.only(
                                                 bottom: 8,
                                               ),
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 10,
-                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 10,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                color: Colors.black.withOpacity(
-                                                  0.5,
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.5,
                                                 ),
                                                 borderRadius:
                                                     BorderRadius.circular(10),
                                                 border: Border.all(
-                                                  color: Colors.white.withOpacity(
-                                                    0.12,
-                                                  ),
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.12),
                                                 ),
                                               ),
                                               child: Column(
@@ -426,7 +408,8 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                                 children: [
                                                   Row(
                                                     crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
                                                       Expanded(
                                                         child: Column(
@@ -446,7 +429,8 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                                                         .w600,
                                                               ),
                                                             ),
-                                                            if (storyCode != null)
+                                                            if (storyCode !=
+                                                                null)
                                                               Text(
                                                                 storyCode,
                                                                 style: TextStyle(
@@ -468,7 +452,9 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                                               ),
                                                           decoration: BoxDecoration(
                                                             color: Colors.white
-                                                                .withOpacity(0.1),
+                                                                .withValues(
+                                                                  alpha: 0.1,
+                                                                ),
                                                             borderRadius:
                                                                 BorderRadius.circular(
                                                                   8,
@@ -479,7 +465,8 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                                                             style: TextStyle(
                                                               color:
                                                                   secondaryText,
-                                                              fontSize: codeSize,
+                                                              fontSize:
+                                                                  codeSize,
                                                             ),
                                                           ),
                                                         ),
@@ -540,7 +527,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
           builder: (context, enabled, _) {
             return DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.55),
+                color: Colors.black.withValues(alpha: 0.55),
                 borderRadius: BorderRadius.circular(22),
               ),
               child: IconButton(

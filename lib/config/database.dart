@@ -27,6 +27,9 @@ class Database {
   // story review music assets
   static const gameMusicPath = "$reviewAssetsURL/assets/torappu/dynamicassets/";
 
+  static String reviewAssetURL(String base, String value) =>
+      Uri.parse(base).resolve(value).toString();
+
   // path to story data
   static const storyDataURLCN =
       "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master";

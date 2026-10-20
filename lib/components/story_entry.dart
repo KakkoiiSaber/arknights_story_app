@@ -8,6 +8,7 @@ class StoryEntry extends StatelessWidget {
   final VoidCallback onTap;
   final double? width;
   final double? height;
+  final bool coverContainsTitle;
 
   const StoryEntry({
     super.key,
@@ -17,6 +18,7 @@ class StoryEntry extends StatelessWidget {
     required this.onTap,
     this.width,
     this.height,
+    this.coverContainsTitle = false,
   });
 
   @override
@@ -48,29 +50,38 @@ class StoryEntry extends StatelessWidget {
                       ),
                       child: kvImage == null
                           ? const Icon(Icons.image_not_supported)
+                          : coverContainsTitle
+                          ? Image(
+                              image: kvImage!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) =>
+                                  const Icon(Icons.image_not_supported),
+                            )
                           : Transform.scale(
                               scale: 1.1,
                               child: Image(
                                 image: kvImage!,
                                 fit: BoxFit.fitHeight,
                                 alignment: Alignment.center,
+                                errorBuilder: (_, _, _) =>
+                                    const Icon(Icons.image_not_supported),
                               ),
                             ),
                     ),
                     if (titleImage != null)
-                        Align(
-                            alignment: Alignment.bottomCenter,
-                            child: SizedBox(
-                              // height: 150,
-                              // width: 200,
-                              height: cardHeight * 0.5,
-                              width: cardWidth * 0.8,
-                              child: Image(
-                                image: titleImage!,
-                                fit: BoxFit.contain,   // or BoxFit.contain / cover
-                              ),
-                            ),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: SizedBox(
+                          // height: 150,
+                          // width: 200,
+                          height: cardHeight * 0.5,
+                          width: cardWidth * 0.8,
+                          child: Image(
+                            image: titleImage!,
+                            fit: BoxFit.contain, // or BoxFit.contain / cover
                           ),
+                        ),
+                      ),
                   ],
                 ),
               ),

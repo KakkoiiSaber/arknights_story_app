@@ -77,6 +77,23 @@ python scripts/altstore_source.py version --ref refs/tags/v0.1.1
 PRTS StoryPlayer 上游以 Git submodule 引入；初始化、版本更新和 Flutter 嵌入方案见
 [上游播放器依赖说明](third_party/README.md)。网页版正文使用上游引擎，首页和活动主题页保留 Flutter 实现。
 
+联动主题信息以数据仓库的 `assets/stage_table_complement.json` 为维护入口；
+生成后的远程元数据包含完整主题字段时优先采用，数据发布前使用随包配置兜底。
+简体中文故事库中 8 个联动活动的随包补充配置集中在
+[`story_themes.json`](lib/assets/data/story_themes.json)：源石尘行动、落叶逐火、
+水晶箭行动、泰拉饭、无忧梦呓、好久不见、泡影苍霆、月行水上。
+它支持独立 URL、带标题的原始入口图、左右拼接背景及 intro/loop 音乐；
+普通活动及其他语言仍按现有远程元数据加载。原始素材出处和替代说明保存在各条目的
+`sources` / `sourceNote` 中；没有独立拆出的 Logo 时显示原始带标题活动图。
+联动封面统一选用原始活动入口图或官方宣传图，按卡片比例等比裁切铺满。
+已找到的四张 `storyreview/hubs` 剧情回顾缩略图作为备选保留在数据仓库中。
+《好久不见》配乐取自首篇剧情实际使用的 `$path_intro` / `$path_loop`，
+在配置中明确标记为 `opening-story`，并非确认过的活动主界面音乐。
+
+运行 `node scripts/verify_story_themes.mjs` 可以检查所有补充素材的 HTTP 状态和媒体类型。
+检查使用局域网预览页的 Referer，避免把 Wiki 站内允许、外部站点被拒绝的地址误判为可用。
+背景通过 Flutter 图片缓存加载，章节列表不等待大图或音乐下载完成。
+
 review data and assets:
 [story review meta/audio/info data](https://github.com/KakkoiiSaber/arknights_story_data/tree/main/assets)
 [story review cover/title/bg/bgmusic assets](https://github.com/KakkoiiSaber/arkdata/tree/main/assets)
