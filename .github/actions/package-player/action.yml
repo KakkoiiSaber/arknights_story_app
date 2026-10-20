@@ -1,0 +1,16 @@
+name: Package native PRTS player
+description: Build the pinned upstream engine and bundle it for Flutter apps
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: npm
+    - shell: bash
+      run: |
+        git submodule update --init --recursive
+        npm ci
+        npm run check:player
+        npm run build:player
+        dart run tool/package_player.dart

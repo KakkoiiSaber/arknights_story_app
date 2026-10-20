@@ -42,6 +42,7 @@ jobs:
 
       - name: Build Flutter Web
         run: |
+          dart run tool/package_player.dart
           flutter build web --release --base-href /arknights_story_app/
           npm run stage:player
 

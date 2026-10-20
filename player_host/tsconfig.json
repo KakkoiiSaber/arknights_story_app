@@ -5,5 +5,5 @@
     "skipLibCheck": true, "types": ["vite/client"], "noEmit": true,
     "allowJs": true
   },
-  "include": ["main.ts"]
+  "include": ["main.ts", "manifest.ts"]
 }

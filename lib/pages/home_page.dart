@@ -4,7 +4,11 @@ import '../components/story_dashboard.dart';
 import '../config/archive_style.dart';
 import '../config/database.dart';
 import '../utils/audio_manager.dart';
+import '../utils/music_controller.dart';
 import '../utils/data_retriever.dart';
+import 'settings_page.dart';
+import '../downloads/review_service.dart';
+import '../components/review_download_panel.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,16 +17,20 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late final Future<dynamic> _storyMetaFuture;
-  late final Future<dynamic> _homeAudioFuture;
+  late Future<dynamic> _storyMetaFuture;
+  late Future<dynamic> _homeAudioFuture;
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
   StoryTypeFilter _filter = StoryTypeFilter.all;
   bool _searchOpen = false;
+  String? _reviewRevision;
+  MusicScope? _music;
 
   @override
   void initState() {
     super.initState();
+    _reviewRevision = reviewAssets.revision;
+    reviewAssets.addListener(_reviewUpdated);
     _storyMetaFuture = DataRetriever.getJsonFromURL(
       Database.storyMetaTablePath,
     );
@@ -31,9 +39,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _playHomeMusic() async {
+    final music = _music = audio.claimMusic();
     final table = await _homeAudioFuture;
     // A delayed request must not replace the activity's music after navigation.
     if (!mounted ||
+        !music.isCurrent ||
         ModalRoute.of(context)?.isCurrent != true ||
         table is! Map) {
       return;
@@ -44,10 +54,24 @@ class _HomePageState extends State<HomePage> {
         ? Database.reviewAssetURL(Database.gameMusicPath, track[key] as String)
         : null;
     if (url('intro') != null) {
-      await audio.intro2loop(url('intro'), url('loop'));
+      await music.play(intro: url('intro'), loop: url('loop'));
     } else {
-      await audio.loop(url('loop'));
+      await music.play(loop: url('loop'));
     }
+  }
+
+  void _reviewUpdated() {
+    if (!mounted || reviewAssets.revision == _reviewRevision) return;
+    _reviewRevision = reviewAssets.revision;
+    setState(() {
+      _storyMetaFuture = DataRetriever.getJsonFromURL(
+        Database.storyMetaTablePath,
+      );
+      _homeAudioFuture = DataRetriever.getJsonFromURL(
+        Database.gameMusicDataPath,
+      );
+    });
+    if (ModalRoute.of(context)?.isCurrent == true) _playHomeMusic();
   }
 
   void _toggleSearch() {
@@ -64,6 +88,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    reviewAssets.removeListener(_reviewUpdated);
+    _music?.close();
     _search.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -109,9 +135,22 @@ class _HomePageState extends State<HomePage> {
                       size: 21,
                     ),
                   ),
+                  IconButton(
+                    tooltip: '设置',
+                    onPressed: () async {
+                      await Navigator.of(context).push(
+                        archiveRoute(context, (_) => const SettingsPage()),
+                      );
+                      if (mounted && _music?.isCurrent != true) {
+                        _playHomeMusic();
+                      }
+                    },
+                    icon: const Icon(Icons.settings_outlined, size: 21),
+                  ),
                 ],
               ),
             ),
+            const ReviewDownloadPanel(compact: true),
             AnimatedSize(
               duration: ArchiveStyle.motion(context, 200),
               curve: Curves.easeOutCubic,

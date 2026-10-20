@@ -37,6 +37,13 @@ migrate_working_dir/
 node_modules/
 web/prts-player/
 player_host/public/
+lib/assets/prts_player.zip
+.cache/
+lib/assets/review_bundle/*
+!lib/assets/review_bundle/.gitkeep
+!lib/assets/review_bundle/files/
+lib/assets/review_bundle/files/*
+!lib/assets/review_bundle/files/.gitkeep
 
 # Symbolication related
 app.*.symbols

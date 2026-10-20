@@ -4,6 +4,11 @@ class Database {
   // path to story review meta data, review info
   static String reviewDataURL =
       "https://raw.githubusercontent.com/KakkoiiSaber/arknights_story_data/main";
+  static String get reviewManifestURL => const String.fromEnvironment(
+    'STORY_REVIEW_MANIFEST_URL',
+    defaultValue:
+        'https://raw.githubusercontent.com/KakkoiiSaber/arknights_story_data/main/assets/review_manifest.json',
+  );
 
   static String storyMetaTablePath =
       "$reviewDataURL/assets/${Config.server}/story_meta_table.json";

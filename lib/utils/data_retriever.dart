@@ -2,11 +2,13 @@
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
+import '../downloads/review_service.dart';
 
 class DataRetriever {
-
   static Future<dynamic> getJsonFromURL(String url) async {
     try {
+      final bundled = await reviewAssets.json(url);
+      if (bundled != null) return bundled;
       final response = await http.get(Uri.parse(url));
       if (response.statusCode != 200) {
         debugPrint("HTTP ${response.statusCode} for $url");

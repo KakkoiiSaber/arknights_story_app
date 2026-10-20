@@ -107,81 +107,75 @@ class _StoryEntryState extends State<StoryEntry> {
         setState(() => _visible = true);
         _resolve();
       },
-      child: Tooltip(
-        message: widget.name,
-        excludeFromSemantics: true,
-        child: Semantics(
-          label: widget.name,
-          button: true,
-          onTap: widget.onTap,
-          child: ExcludeSemantics(
-            child: AnimatedContainer(
-              duration: ArchiveStyle.motion(context, 180),
-              curve: Curves.easeOutCubic,
-              width: width,
-              height: widget.height,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: widget.onTap,
-                  onHover: (value) => setState(() => _hovered = value),
-                  onFocusChange: (value) => setState(() => _focused = value),
-                  hoverColor: Colors.transparent,
-                  highlightColor: Colors.white.withValues(alpha: 0.04),
-                  child: Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      AnimatedSlide(
-                        offset: highlighted
-                            ? const Offset(0, -0.02)
-                            : Offset.zero,
-                        duration: ArchiveStyle.motion(context, 200),
-                        child: SizedBox(
-                          height: height,
-                          width: width,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              if (_visible &&
-                                  widget.kvImage != null &&
-                                  !_failed)
-                                Image(
-                                  image: widget.kvImage!,
-                                  fit: BoxFit.contain,
-                                  gaplessPlayback: true,
-                                  errorBuilder: (_, _, _) => _fallback(),
-                                )
-                              else if (_failed || widget.kvImage == null)
-                                _fallback(),
-                              if (_visible &&
-                                  widget.titleImage != null &&
-                                  !_failed)
-                                Align(
-                                  alignment: Alignment.bottomCenter,
-                                  child: FractionallySizedBox(
-                                    widthFactor: 0.92,
-                                    heightFactor: 0.52,
-                                    child: Image(
-                                      image: widget.titleImage!,
-                                      fit: BoxFit.contain,
-                                      alignment: Alignment.bottomCenter,
-                                      errorBuilder: (_, _, _) =>
-                                          const SizedBox.shrink(),
-                                    ),
+      child: Semantics(
+        label: widget.name,
+        button: true,
+        onTap: widget.onTap,
+        child: ExcludeSemantics(
+          child: AnimatedContainer(
+            duration: ArchiveStyle.motion(context, 180),
+            curve: Curves.easeOutCubic,
+            width: width,
+            height: widget.height,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onTap,
+                onHover: (value) => setState(() => _hovered = value),
+                onFocusChange: (value) => setState(() => _focused = value),
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.white.withValues(alpha: 0.04),
+                child: Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    AnimatedSlide(
+                      offset: highlighted
+                          ? const Offset(0, -0.02)
+                          : Offset.zero,
+                      duration: ArchiveStyle.motion(context, 200),
+                      child: SizedBox(
+                        height: height,
+                        width: width,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (_visible && widget.kvImage != null && !_failed)
+                              Image(
+                                image: widget.kvImage!,
+                                fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                                errorBuilder: (_, _, _) => _fallback(),
+                              )
+                            else if (_failed || widget.kvImage == null)
+                              _fallback(),
+                            if (_visible &&
+                                widget.titleImage != null &&
+                                !_failed)
+                              Align(
+                                alignment: Alignment.bottomCenter,
+                                child: FractionallySizedBox(
+                                  widthFactor: 0.92,
+                                  heightFactor: 0.52,
+                                  child: Image(
+                                    image: widget.titleImage!,
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.bottomCenter,
+                                    errorBuilder: (_, _, _) =>
+                                        const SizedBox.shrink(),
                                   ),
                                 ),
-                            ],
-                          ),
+                              ),
+                          ],
                         ),
                       ),
-                      if (highlighted)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: CustomPaint(painter: _CoverCorners()),
-                          ),
+                    ),
+                    if (highlighted)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: CustomPaint(painter: _CoverCorners()),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             ),

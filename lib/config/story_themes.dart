@@ -17,7 +17,7 @@ class StoryThemeAssets {
       backgroundAspectRatio =
           (json['backgroundAspectRatio'] as num?)?.toDouble() ?? 16 / 9,
       musicIntroUrl = json['musicIntroUrl'] as String?,
-      musicLoopUrl = json['musicLoopUrl'] as String,
+      musicLoopUrl = json['musicLoopUrl'] as String?,
       musicRole = json['musicRole'] as String,
       coverContainsTitle = json['coverContainsTitle'] as bool? ?? false,
       titleIsBanner = json['titleIsBanner'] as bool? ?? false;
@@ -28,8 +28,10 @@ class StoryThemeAssets {
   final List<String> backgroundUrls;
   final double backgroundAspectRatio;
   final String? musicIntroUrl;
-  final String musicLoopUrl;
+  final String? musicLoopUrl;
   final String musicRole;
+  bool get hasReviewMusic =>
+      musicRole == 'activity-theme' && musicLoopUrl?.isNotEmpty == true;
   final bool coverContainsTitle;
   final bool titleIsBanner;
 }
@@ -61,8 +63,7 @@ class StoryThemes {
       final backgrounds = metadata['backgroundUrls'] as List?;
       final backgroundId = metadata['backgroundId'] as String?;
       final titleId = metadata['titleImageId'] as String?;
-      if (audio['loop'] is String &&
-          titleId != null &&
+      if (titleId != null &&
           (backgrounds?.isNotEmpty == true || backgroundId != null)) {
         return StoryThemeAssets.fromJson({
           'name': metadata['name'],

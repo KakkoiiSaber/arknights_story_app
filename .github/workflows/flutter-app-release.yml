@@ -39,6 +39,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - uses: ./.github/actions/package-player
       - run: flutter build apk --release --split-per-abi --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package Android
@@ -77,6 +78,7 @@ jobs:
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             gstreamer1.0-plugins-base gstreamer1.0-tools gstreamer1.0-x
           flutter pub get
+      - uses: ./.github/actions/package-player
       - run: flutter build linux --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package Linux
@@ -105,6 +107,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - uses: ./.github/actions/package-player
       - run: flutter build macos --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package macOS
@@ -136,6 +139,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - uses: ./.github/actions/package-player
       - run: flutter build ios --release --no-codesign --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 
       - name: Package iOS
@@ -181,6 +185,8 @@ jobs:
           cache: true
       - shell: bash
         run: flutter pub get
+      - uses: NuGet/setup-nuget@v2
+      - uses: ./.github/actions/package-player
       - shell: bash
         run: flutter build windows --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
 

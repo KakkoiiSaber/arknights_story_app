@@ -86,10 +86,10 @@
     "backgroundUrls": [
       "https://media.prts.wiki/a/aa/%E6%B4%BB%E5%8A%A8%E9%A2%84%E5%91%8A_%E5%A5%BD%E4%B9%85%E4%B8%8D%E8%A7%81_01.jpg"
     ],
-    "musicIntroUrl": "https://raw.githubusercontent.com/akgcc/arkdata/main/assets/torappu/dynamicassets/audio/sound_beta_2/music/a001/m_dia_path_intro.mp3",
-    "musicLoopUrl": "https://raw.githubusercontent.com/akgcc/arkdata/main/assets/torappu/dynamicassets/audio/sound_beta_2/music/a001/m_dia_path_loop.mp3",
-    "musicRole": "opening-story",
-    "sourceNote": "封面和带标题头图使用官方活动宣传图（PRTS存档）；配乐为首篇剧情实用的 $path_intro/$path_loop，未冒充独立活动主界面BGM",
+    "musicIntroUrl": null,
+    "musicLoopUrl": null,
+    "musicRole": "none",
+    "sourceNote": "未确认剧情回顾主题音乐，介绍页保持静音；封面使用官方活动宣传图",
     "coverContainsTitle": true,
     "titleUrl": "https://media.prts.wiki/a/aa/%E6%B4%BB%E5%8A%A8%E9%A2%84%E5%91%8A_%E5%A5%BD%E4%B9%85%E4%B8%8D%E8%A7%81_01.jpg",
     "sources": [

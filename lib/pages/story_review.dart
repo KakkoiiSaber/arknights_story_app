@@ -3,10 +3,15 @@ import '../config/database.dart';
 import '../config/archive_style.dart';
 import '../components/story_chapter_entry.dart';
 import '../config/story_themes.dart';
+import '../downloads/review_service.dart';
 import '../components/story_background.dart';
 import '../utils/audio_manager.dart';
+import '../utils/music_controller.dart';
 import '../utils/data_retriever.dart';
 import 'story.dart';
+import '../story/story_playlist.dart';
+import '../components/chapter_download_button.dart';
+import '../story/story_script.dart' show storyTxtPath;
 
 class StoryReviewPage extends StatefulWidget {
   final String storyId;
@@ -25,6 +30,7 @@ class StoryReviewPage extends StatefulWidget {
 
 class _StoryReviewPageState extends State<StoryReviewPage> {
   final _scroll = ScrollController();
+  late MusicScope _music;
 
   Map<String, dynamic>? _story;
   bool _loading = true;
@@ -33,6 +39,9 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   List<String> _backgroundUrls = const [];
   List<ImageProvider> _bgProviders = const [];
   bool _readingStory = false;
+  String? _reviewRevision;
+  bool _needsRefresh = false;
+  Future<void>? _loadingStory;
   ImageProvider? _titleProvider;
   StoryThemeAssets? get _theme =>
       StoryThemes.forStory(widget.storyId, metadata: _story);
@@ -47,11 +56,14 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   @override
   void initState() {
     super.initState();
+    _music = audio.claimMusic();
+    _reviewRevision = reviewAssets.revision;
+    reviewAssets.addListener(_reviewUpdated);
     _loadStory();
   }
 
   Future<void> _stopAllAudio() async {
-    await audio.stop();
+    await Future.wait([_music.close(), audio.stopSfx()]);
   }
 
   Future<void> _openStory({
@@ -68,6 +80,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         context,
         (_) => StoryPage(
           storyTxtPath: storyTxt,
+          playlist: StoryPlaylistEntry.fromReview(infoUnlockDatas),
           storyName: storyName,
           storyCode: storyCode,
           storyTag: storyTag,
@@ -75,11 +88,37 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       ),
     );
     _readingStory = false;
-    if (mounted) await _playBgMusic(gameMusicName);
+    if (mounted) {
+      _music = audio.claimMusic();
+      if (_needsRefresh) {
+        _needsRefresh = false;
+        await _loadStory();
+      } else {
+        await _playBgMusic(gameMusicName);
+      }
+    }
   }
 
-  Future<void> _loadStory() async {
-    await _stopAllAudio();
+  void _reviewUpdated() {
+    if (!mounted || reviewAssets.revision == _reviewRevision) return;
+    _reviewRevision = reviewAssets.revision;
+    _needsRefresh = true;
+    if (!_readingStory && _loadingStory == null) {
+      _needsRefresh = false;
+      _loadStory();
+    }
+  }
+
+  Future<void> _loadStory() =>
+      _loadingStory ??= _loadStoryContent().whenComplete(() {
+        _loadingStory = null;
+        if (_needsRefresh && mounted && !_readingStory) {
+          _needsRefresh = false;
+          _loadStory();
+        }
+      });
+
+  Future<void> _loadStoryContent() async {
     if (!mounted) return;
     final url = '${Database.reviewInfoPath}${widget.storyId}.json';
     try {
@@ -148,7 +187,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   }
 
   Future<void> _preloadBackground(List<String> urls) async {
-    final providers = [for (final url in urls) NetworkImage(url)];
+    final providers = [for (final url in urls) reviewAssets.image(url)];
     final loaded = await Future.wait(providers.map(_precache));
     if (!mounted) return;
     setState(() {
@@ -160,30 +199,47 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
   Future<void> _preloadTitleImage(String? url) async {
     if (url == null || url.isEmpty) return;
-    final provider = NetworkImage(url);
+    final provider = reviewAssets.image(url);
     final loaded = await _precache(provider);
     if (!mounted) return;
     setState(() => _titleProvider = loaded ? provider : null);
   }
 
   Future<void> _playBgMusic(String? musicKey) async {
-    if (!mounted || _readingStory) return;
+    final music = _music;
+    if (!mounted || _readingStory || !music.isCurrent) return;
+    // Old cached data may still carry the retired first-story music fallback.
+    if (_story?['musicRole'] == 'opening-story' ||
+        _story?['musicRole'] == 'none' ||
+        musicKey?.startsWith('story.') == true) {
+      await music.play();
+      return;
+    }
     final theme = _theme;
     if (theme != null) {
+      if (!theme.hasReviewMusic) {
+        await music.play();
+        return;
+      }
       if (theme.musicIntroUrl != null) {
-        await audio.intro2loop(theme.musicIntroUrl, theme.musicLoopUrl);
+        await music.play(intro: theme.musicIntroUrl, loop: theme.musicLoopUrl);
       } else {
-        await audio.loop(theme.musicLoopUrl);
+        await music.play(loop: theme.musicLoopUrl);
       }
       return;
     }
-    if (musicKey == null) return;
+    if (musicKey == null) {
+      await music.play();
+      return;
+    }
 
     final audioTable = await DataRetriever.getJsonFromURL(
       Database.gameMusicDataPath,
     );
 
-    if (!mounted || _readingStory || audioTable is! Map) return;
+    if (!mounted || _readingStory || !music.isCurrent || audioTable is! Map) {
+      return;
+    }
     final trackInfo = audioTable[musicKey];
     if (trackInfo is! Map) return;
 
@@ -192,15 +248,15 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
     if (introPath == null && loopPath == null) return;
     if (introPath == null && loopPath != null) {
-      await audio.loop(
-        Database.reviewAssetURL(Database.gameMusicPath, loopPath),
+      await music.play(
+        loop: Database.reviewAssetURL(Database.gameMusicPath, loopPath),
       );
       return;
     }
     if (introPath != null && loopPath != null) {
-      await audio.intro2loop(
-        Database.reviewAssetURL(Database.gameMusicPath, introPath),
-        Database.reviewAssetURL(Database.gameMusicPath, loopPath),
+      await music.play(
+        intro: Database.reviewAssetURL(Database.gameMusicPath, introPath),
+        loop: Database.reviewAssetURL(Database.gameMusicPath, loopPath),
       );
       return;
     }
@@ -208,8 +264,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
   @override
   void dispose() {
-    // Stop page-specific music when leaving (remove if you want continuous music)
-    audio.stop();
+    reviewAssets.removeListener(_reviewUpdated);
+    // The pop future can resume home before this exit animation disposes us.
+    // Closing this scope must never stop the new homepage music.
+    _music.close();
     _scroll.dispose();
     super.dispose();
   }
@@ -300,6 +358,22 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         ),
         const SizedBox(height: 26),
       ],
+      if (infoUnlockDatas.isNotEmpty)
+        ChapterDownloadButton(
+          storyId: 'story:${Database.storyContentPath}:${widget.storyId}',
+          title: name ?? widget.storyId,
+          chapters: {
+            for (final raw in infoUnlockDatas)
+              if (raw is Map &&
+                  raw['storyTxt'] is String &&
+                  (raw['storyTxt'] as String).isNotEmpty)
+                '${Database.storyContentPath}${storyTxtPath(raw['storyTxt'] as String)}':
+                    [raw['storyCode'], raw['storyName'], raw['avgTag']]
+                        .whereType<String>()
+                        .where((part) => part.isNotEmpty)
+                        .join(' · '),
+          },
+        ),
       for (var i = 0; i < infoUnlockDatas.length; i++)
         _chapter(
           infoUnlockDatas[i] as Map,

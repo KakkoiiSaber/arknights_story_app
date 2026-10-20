@@ -1,10 +1,13 @@
 import { sound } from '@pixi/sound';
+import { ReaderControls } from './reader-controls';
+import { StoryQueue, CompletionTransition } from './story-queue.mjs';
 import { loadContextByScript } from '../third_party/prts-widgets/src/widgets/StoryPlayer/context';
 import { createStoryPlayer } from '../third_party/prts-widgets/src/widgets/StoryPlayer/engine/createStoryPlayer';
 import { preloadContextAssets } from '../third_party/prts-widgets/src/widgets/StoryPlayer/engine/preload';
 import { parseScript } from '../third_party/prts-widgets/src/widgets/StoryPlayer/engine/parser';
-import { resolveScriptURL } from './source.mjs';
 import { loadingWindow } from './loading-window.mjs';
+import { installNativeDelivery } from './native-delivery';
+import { installReaderPreferences } from './reader-preferences';
 import type { StoryPlayer } from '../third_party/prts-widgets/src/widgets/StoryPlayer/engine/types';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -16,15 +19,17 @@ const progress = element<HTMLProgressElement>('progress');
 const retry = element<HTMLButtonElement>('retry');
 const restart = element<HTMLButtonElement>('restart');
 const query = new URLSearchParams(location.search);
+installReaderPreferences(query);
+const controls = new ReaderControls();
+installNativeDelivery();
 stage.dataset.resources = 'prts';
-const returnButton = element<HTMLButtonElement>('return');
-returnButton.hidden = window.parent === window;
-returnButton.onclick = () => window.parent.postMessage('arkstory:exit', location.origin);
-element('title').textContent = query.get('title') || '黑暗时代·上 · 序章·上';
 let player: StoryPlayer | null = null;
 let ready = false;
 let generation = 0;
 let disposed = false;
+let queue: StoryQueue;
+const completion = new CompletionTransition();
+let finishShown = false;
 const audioContext = sound.context.audioContext;
 function syncAudioState() { stage.dataset.audioState = audioContext.state; }
 function unlockAudio() {
@@ -50,10 +55,14 @@ function fail(error: unknown) {
   retry.onclick = () => { void load(); };
 }
 
-async function load() {
+async function load(continuing = false) {
+  const playback = continuing ? player?.getAutoPlayState() : null;
+  completion.reset();
+  finishShown = false;
   const started = performance.now();
   const current = ++generation;
   ready = false;
+  controls.attach(null);
   player?.destroy();
   player = null;
   overlay.hidden = false;
@@ -64,7 +73,10 @@ async function load() {
   retry.hidden = true;
   restart.disabled = true;
   try {
-    const scriptURL = resolveScriptURL(query.get('script'));
+    queue ??= new StoryQueue(query.get('script'), query.get('playlist'));
+    const scriptURL = queue.current.script;
+    document.title = queue.current.title || query.get('title') || '剧情阅读';
+    stage.dataset.script = scriptURL;
     let response: Response;
     try { response = await fetch(scriptURL, { signal: AbortSignal.timeout(30000) }); }
     catch (error) {
@@ -108,6 +120,11 @@ async function load() {
     player = createStoryPlayer(context);
     await player.mount(stage);
     if (current !== generation || disposed) { player?.destroy(); player = null; return; }
+    controls.attach(player, lines, context.audioVariables);
+    if (playback) {
+      player.setAutoPlayMode(playback.mode);
+      player.setAutoPlaySpeedLevel(playback.mode === 'quick_play' ? playback.quickSpeedLevel : playback.buttonSpeedLevel);
+    }
     ready = true;
     const loadMs = Math.round(performance.now() - started);
     stage.dataset.loadMs = String(loadMs);
@@ -159,7 +176,7 @@ async function begin() {
 }
 
 function advance() {
-  if (!ready || !player || !overlay.hidden) return;
+  if (!ready || !player || !overlay.hidden || controls.modalOpen) return;
   void player.advance().catch(fail);
 }
 stage.addEventListener('click', advance);
@@ -170,22 +187,28 @@ stage.addEventListener('keydown', event => {
   }
 });
 restart.onclick = () => { void load(); };
-element('fullscreen').onclick = () => {
-  if (!document.fullscreenElement) void document.documentElement.requestFullscreen().catch(fail);
-  else void document.exitFullscreen();
-};
+function nextSection() {
+  if (!ready || disposed || controls.modalOpen || !queue.advance()) return;
+  void load(true);
+}
 const poll = setInterval(() => {
   if (!ready || !player) return;
   stage.dataset.state = player.getState();
+  controls.sync();
   if (player.getState() === 'finished') {
-    overlay.hidden = false;
-    heading.textContent = '本节故事结束';
-    status.textContent = '可以重新阅读，或返回活动主题页。';
-    progress.hidden = true;
-    retry.hidden = false;
-    retry.textContent = '重新阅读';
-    retry.onclick = () => { void load(); };
+    if (!finishShown) {
+      finishShown = true;
+      overlay.hidden = false;
+      heading.textContent = queue.isStoryEnd ? '整部故事已结束' : '本节故事结束';
+      status.textContent = queue.next ? `即将进入下一节：${queue.next.title || '下一节'}` : '可以重新阅读，或返回故事页。';
+      progress.hidden = true;
+      retry.hidden = false;
+      retry.textContent = queue.next ? '继续下一节' : '重新阅读';
+      retry.onclick = () => { if (queue.next) nextSection(); else void load(); };
+    }
+    if (queue.next && completion.tick(performance.now(), controls.modalOpen)) nextSection();
   }
+
 }, 100);
 window.addEventListener('pagehide', () => {
   disposed = true;
@@ -195,6 +218,7 @@ window.addEventListener('pagehide', () => {
   document.removeEventListener('click', unlockAudio, true);
   document.removeEventListener('keydown', unlockAudio, true);
   audioContext.removeEventListener('statechange', syncAudioState);
+  controls.attach(null);
   player?.destroy();
   player = null;
 });

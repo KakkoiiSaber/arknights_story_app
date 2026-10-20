@@ -4,6 +4,7 @@ import '../config/archive_style.dart';
 import '../config/database.dart';
 import '../config/story_catalog.dart';
 import '../config/story_themes.dart';
+import '../downloads/review_service.dart';
 import '../pages/story_review.dart';
 import 'story_entry.dart';
 
@@ -68,8 +69,8 @@ class _StoryDashboardState extends State<StoryDashboard> {
     return StoryEntry(
       key: ValueKey(id),
       name: story['name'] as String? ?? id,
-      kvImage: coverUrl == null ? null : NetworkImage(coverUrl),
-      titleImage: titleUrl == null ? null : NetworkImage(titleUrl),
+      kvImage: coverUrl == null ? null : reviewAssets.image(coverUrl),
+      titleImage: titleUrl == null ? null : reviewAssets.image(titleUrl),
       height: height,
       maxWidth: maxWidth,
       aspectRatio:

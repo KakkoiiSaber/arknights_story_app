@@ -44,7 +44,7 @@ void main() {
           theme.titleUrl,
           ...theme.backgroundUrls,
           if (theme.musicIntroUrl != null) theme.musicIntroUrl!,
-          theme.musicLoopUrl,
+          if (theme.musicLoopUrl != null) theme.musicLoopUrl!,
         ]) {
           final uri = Uri.parse(url);
           expect(uri.scheme, 'https', reason: id);
@@ -60,7 +60,9 @@ void main() {
   test(
     'special sources are explicitly described, not mistaken for original menu music',
     () {
-      expect(StoryThemes.forStory('act13mini')!.musicRole, 'opening-story');
+      expect(StoryThemes.forStory('act13mini')!.musicRole, 'none');
+      expect(StoryThemes.forStory('act13mini')!.musicLoopUrl, isNull);
+      expect(StoryThemes.forStory('act13mini')!.hasReviewMusic, isFalse);
       final hunter = StoryThemes.forStory('act24side')!;
       expect(hunter.backgroundUrls.length, 2);
       expect(hunter.backgroundAspectRatio, closeTo(1560 / 960, 0.001));
@@ -76,6 +78,41 @@ void main() {
     Config.server = 'en_US';
     expect(StoryThemes.forStory('act17d0'), isNull);
   });
+
+  test(
+    'silent themes retain their artwork and legacy story music is rejected',
+    () {
+      final theme = StoryThemes.forStory(
+        'act13mini',
+        metadata: {
+          'name': '好久不见',
+          'kvImageId': 'https://example.com/card.png',
+          'titleImageId': 'https://example.com/title.png',
+          'backgroundId': 'https://example.com/bg.png',
+          'audio': {'intro': null, 'loop': null},
+          'musicRole': 'none',
+        },
+      )!;
+      expect(theme.coverUrl, 'https://example.com/card.png');
+      expect(theme.backgroundUrls.single, 'https://example.com/bg.png');
+      expect(theme.hasReviewMusic, isFalse);
+      final legacy = StoryThemes.forStory(
+        'act13mini',
+        metadata: {
+          'name': '好久不见',
+          'kvImageId': 'https://example.com/card.png',
+          'titleImageId': 'https://example.com/title.png',
+          'backgroundId': 'https://example.com/bg.png',
+          'audio': {
+            'intro': null,
+            'loop': 'https://example.com/first-story.mp3',
+          },
+          'musicRole': 'opening-story',
+        },
+      )!;
+      expect(legacy.hasReviewMusic, isFalse);
+    },
+  );
 
   test(
     'published complement metadata takes precedence over bundled fallback',

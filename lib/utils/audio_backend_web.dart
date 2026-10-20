@@ -4,6 +4,11 @@ import 'dart:js_interop';
 import 'package:audioplayers/audioplayers.dart' show ReleaseMode, UrlSource;
 import 'package:web/web.dart' as web;
 
+UrlSource reviewAudioSource(String url, String? asset, {String? localFile}) =>
+    UrlSource(
+      asset == null ? url : Uri.base.resolve('assets/$asset').toString(),
+    );
+
 /// A shared context keeps homepage and activity music unlocked across routes.
 /// Sources may be scheduled while suspended; time only advances after a real
 /// user gesture resumes the context. No silent playback or synthetic click.
@@ -21,7 +26,9 @@ class _BrowserAudio {
     final unlock = ((web.Event event) {
       if (!event.isTrusted || context.state != 'suspended') return;
       // Call synchronously inside the gesture, before any fetch/await.
-      unawaited(context.resume().toDart.then<void>((_) {}, onError: (Object _) {}));
+      unawaited(
+        context.resume().toDart.then<void>((_) {}, onError: (Object _) {}),
+      );
     }).toJS;
     web.document.addEventListener('click', unlock, true.toJS);
     web.document.addEventListener('touchend', unlock, true.toJS);
