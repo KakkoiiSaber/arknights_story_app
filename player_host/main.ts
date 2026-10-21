@@ -1,4 +1,5 @@
 import { sound } from '@pixi/sound';
+import { installAudioLifecycle } from './audio-lifecycle.mjs';
 import { ReaderControls } from './reader-controls';
 import { StoryQueue, CompletionTransition } from './story-queue.mjs';
 import { loadContextByScript } from '../third_party/prts-widgets/src/widgets/StoryPlayer/context';
@@ -31,17 +32,11 @@ let queue: StoryQueue;
 const completion = new CompletionTransition();
 let finishShown = false;
 const audioContext = sound.context.audioContext;
-function syncAudioState() { stage.dataset.audioState = audioContext.state; }
-function unlockAudio() {
-  // Browsers may require a gesture for sound. Visual playback must not wait
-  // for resume(), whose promise can remain pending until that gesture occurs.
-  if (audioContext.state === 'suspended') void audioContext.resume().catch(() => {});
-  syncAudioState();
-}
-audioContext.addEventListener('statechange', syncAudioState);
-document.addEventListener('pointerdown', unlockAudio, true);
-document.addEventListener('click', unlockAudio, true);
-document.addEventListener('keydown', unlockAudio, true);
+const playerAudio = installAudioLifecycle({ context: audioContext, stage,
+  native: query.get('native') === '1' });
+const unlockAudio = playerAudio.resume;
+// Called after the native app reactivates its iOS audio session on foreground.
+Object.assign(globalThis, { __arkstoryResumeAudio: unlockAudio });
 
 function fail(error: unknown) {
   console.error('[PRTS host]', error);
@@ -214,10 +209,7 @@ window.addEventListener('pagehide', () => {
   disposed = true;
   generation++;
   clearInterval(poll);
-  document.removeEventListener('pointerdown', unlockAudio, true);
-  document.removeEventListener('click', unlockAudio, true);
-  document.removeEventListener('keydown', unlockAudio, true);
-  audioContext.removeEventListener('statechange', syncAudioState);
+  playerAudio.dispose();
   controls.attach(null);
   player?.destroy();
   player = null;

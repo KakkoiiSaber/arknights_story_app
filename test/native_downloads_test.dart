@@ -21,6 +21,7 @@ void main() {
   late String shared;
   late String slow;
   var fail = false;
+  final failures = <String, int>{};
   setUp(() async {
     directory = await Directory.systemTemp.createTemp(
       'arkstory-download-test-',
@@ -28,14 +29,15 @@ void main() {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     requests = {};
     fail = false;
+    failures.clear();
     shared = 'http://127.0.0.1:${server.port}/shared.png';
     slow = 'http://127.0.0.1:${server.port}/slow.mp3';
     server.listen((request) async {
       final path = request.uri.path;
       requests.update(path, (n) => n + 1, ifAbsent: () => 1);
       try {
-        if (fail) {
-          request.response.statusCode = 404;
+        if (fail || failures.containsKey(path)) {
+          request.response.statusCode = failures[path] ?? 404;
           await request.response.close();
           return;
         }
@@ -66,6 +68,93 @@ void main() {
     await server.close(force: true);
     await directory.delete(recursive: true);
   });
+  test('pausing a preferred source never starts its fallback', () async {
+    await downloads.shutdown();
+    const original = 'https://torappu.prts.wiki/assets/audio/music/fixture.mp3';
+    final base = 'http://127.0.0.1:${server.port}';
+    downloads = NativeDownloads(
+      directory,
+      resolveManifest: (_) async => [original],
+      sourceResolver: (_) => [
+        Uri.parse('$base/slow.mp3'),
+        Uri.parse('$base/prts.mp3'),
+      ],
+    );
+    await downloads.init();
+    await downloads.start('pause-source', 'Pause');
+    await until(() => requests['/slow.mp3'] != null);
+    await downloads.pause('pause-source');
+    expect(downloads.taskFor('pause-source')?.state, DownloadState.paused);
+    expect(requests['/prts.mp3'], isNull);
+    expect(await downloads.fileFor(original).exists(), isFalse);
+  });
+  test(
+    'preferred source success and fallback share one canonical cached file',
+    () async {
+      await downloads.shutdown();
+      const original =
+          'https://torappu.prts.wiki/assets/avg/images/fixture.png';
+      final base = 'http://127.0.0.1:${server.port}';
+      downloads = NativeDownloads(
+        directory,
+        resolveManifest: (_) async => [original],
+        sourceResolver: (_) => [
+          Uri.parse('$base/raw.png'),
+          Uri.parse('$base/prts.png'),
+        ],
+      );
+      await downloads.init();
+      failures['/raw.png'] = 404;
+      await downloads.start('fallback', 'Fallback');
+      await until(
+        () => downloads.taskFor('fallback')?.state == DownloadState.complete,
+      );
+      expect(requests['/raw.png'], 1);
+      expect(requests['/prts.png'], 1);
+      expect(await downloads.fileFor(original).length(), 128);
+      await downloads.start('reuse', 'Reuse');
+      await until(
+        () => downloads.taskFor('reuse')?.state == DownloadState.complete,
+      );
+      expect(requests['/raw.png'], 1);
+      expect(requests['/prts.png'], 1);
+    },
+  );
+
+  test(
+    'preferred success never requests fallback; all errors leave no completed file',
+    () async {
+      await downloads.shutdown();
+      const original =
+          'https://torappu.prts.wiki/assets/audio/sound/fixture.mp3';
+      final base = 'http://127.0.0.1:${server.port}';
+      downloads = NativeDownloads(
+        directory,
+        resolveManifest: (_) async => [original],
+        sourceResolver: (_) => [
+          Uri.parse('$base/raw.mp3'),
+          Uri.parse('$base/prts.mp3'),
+        ],
+      );
+      await downloads.init();
+      await downloads.start('success', 'Success');
+      await until(
+        () => downloads.taskFor('success')?.state == DownloadState.complete,
+      );
+      expect(requests['/prts.mp3'], isNull);
+      await downloads.remove('success');
+      failures.addAll({'/raw.mp3': 503, '/prts.mp3': 404});
+      await downloads.start('failed', 'Failed');
+      await until(
+        () => downloads.taskFor('failed')?.state == DownloadState.failed,
+      );
+      expect(await downloads.fileFor(original).exists(), isFalse);
+      expect(
+        await File('${downloads.fileFor(original).path}.part').exists(),
+        isFalse,
+      );
+    },
+  );
   test(
     'shared resources download once and survive deleting another chapter',
     () async {
