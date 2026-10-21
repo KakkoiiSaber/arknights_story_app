@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import '../downloads/native_downloads.dart';
+import '../downloads/story_resource_sources.dart';
 
 /// Bound only to loopback, with an unguessable per-launch route prefix.
 /// Remote assets use a same-origin route so worker/image/audio/video requests
@@ -99,17 +100,7 @@ class NativePlayerHost {
           }
         } else {
           remoteRequests++;
-          final upstream = await _remote
-              .openUrl(request.method, url)
-              .timeout(const Duration(seconds: 30));
-          upstream.headers.set(HttpHeaders.refererHeader, 'https://prts.wiki/');
-          final range = request.headers.value(HttpHeaders.rangeHeader);
-          if (range != null) {
-            upstream.headers.set(HttpHeaders.rangeHeader, range);
-          }
-          final response = await upstream.close().timeout(
-            const Duration(seconds: 60),
-          );
+          final response = await _resourceResponse(request, raw);
           request.response.statusCode = response.statusCode;
           for (final header in [
             'content-type',
@@ -118,6 +109,11 @@ class NativePlayerHost {
           ]) {
             final value = response.headers.value(header);
             if (value != null) request.response.headers.set(header, value);
+          }
+          if (response.contentLength >= 0 &&
+              response.compressionState !=
+                  HttpClientResponseCompressionState.decompressed) {
+            request.response.contentLength = response.contentLength;
           }
           if (request.method != 'HEAD') {
             await request.response.addStream(response);
@@ -141,6 +137,36 @@ class NativePlayerHost {
     } finally {
       await request.response.close();
     }
+  }
+
+  Future<HttpClientResponse> _resourceResponse(
+    HttpRequest request,
+    String url,
+  ) async {
+    Object? failure;
+    for (final source in downloads.sourcesFor(url)) {
+      HttpClientRequest? upstream;
+      try {
+        upstream = await _remote
+            .openUrl(request.method, source)
+            .timeout(Duration(seconds: isGitHubRaw(source) ? 8 : 30));
+        upstream.headers.set(HttpHeaders.refererHeader, 'https://prts.wiki/');
+        final range = request.headers.value(HttpHeaders.rangeHeader);
+        if (range != null) upstream.headers.set(HttpHeaders.rangeHeader, range);
+        final response = await upstream.close().timeout(
+          Duration(seconds: isGitHubRaw(source) ? 12 : 60),
+        );
+        if (response.statusCode == 200 || response.statusCode == 206) {
+          return response;
+        }
+        await response.listen(null).cancel();
+        throw HttpException('HTTP ${response.statusCode}', uri: source);
+      } catch (error) {
+        upstream?.abort();
+        failure = error;
+      }
+    }
+    throw failure ?? StateError('未找到可用资源来源');
   }
 
   static String _mime(String path) =>

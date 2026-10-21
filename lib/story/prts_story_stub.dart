@@ -5,6 +5,8 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../downloads/native_service.dart';
 import 'native_player_host.dart';
 import '../settings/reader_settings.dart';
+import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 
 /// Native platforms run the same pinned PRTS build inside their system WebView.
 class PrtsStoryView extends StatefulWidget {
@@ -25,11 +27,50 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
   late Future<NativePlayerHost> _host;
   String? _loadError;
   InAppWebViewController? _controller;
+  late final AppLifecycleListener _lifecycle;
   @override
   void initState() {
     super.initState();
-    _host = downloadService.playerHost();
+    _host = _prepareHost();
+    _lifecycle = AppLifecycleListener(
+      onResume: () async {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+        await _activateAudio();
+        if (!mounted) return;
+        await _controller
+            ?.evaluateJavascript(
+              source: 'globalThis.__arkstoryResumeAudio?.();',
+            )
+            .catchError((Object _) => null);
+      },
+    );
     readerSettings.addListener(_syncPreferences);
+  }
+
+  Future<void> _activateAudio() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    try {
+      // The outgoing audioplayers route deactivates AVAudioSession when its
+      // last player stops. Hand ownership to the embedded story player.
+      final session = await AudioSession.instance.timeout(
+        const Duration(seconds: 5),
+      );
+      await session
+          .configure(const AudioSessionConfiguration.music())
+          .timeout(const Duration(seconds: 5));
+      final active = await session
+          .setActive(true)
+          .timeout(const Duration(seconds: 5));
+      if (!active) debugPrint('PRTS iOS audio session activation declined');
+    } catch (error) {
+      debugPrint('PRTS iOS audio session activation failed: $error');
+    }
+  }
+
+  Future<NativePlayerHost> _prepareHost() async {
+    final host = await downloadService.playerHost();
+    if (mounted) await _activateAudio();
+    return host;
   }
 
   void _syncPreferences() {
@@ -43,6 +84,7 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     readerSettings.removeListener(_syncPreferences);
     _controller = null;
     super.dispose();
@@ -143,7 +185,16 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
                 },
               );
             },
-            onLoadStop: (_, _) => _syncPreferences(),
+            onLoadStop: (_, _) async {
+              _syncPreferences();
+              await _activateAudio();
+              if (!mounted) return;
+              await _controller
+                  ?.evaluateJavascript(
+                    source: 'globalThis.__arkstoryResumeAudio?.();',
+                  )
+                  .catchError((Object _) => null);
+            },
             shouldOverrideUrlLoading: (_, action) async =>
                 action.request.url?.origin == host.base.origin
                 ? NavigationActionPolicy.ALLOW

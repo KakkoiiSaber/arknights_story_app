@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'download_task.dart';
+import 'story_resource_sources.dart';
 
 typedef ManifestResolver = Future<List<String>> Function(String id);
 
@@ -15,7 +16,11 @@ class NativeDownloads extends ChangeNotifier {
     required this.resolveManifest,
     this.cancelManifest,
     HttpClient? client,
-  }) : _client = client ?? HttpClient();
+    StorySourceResolver? sourceResolver,
+  }) : _client = client ?? HttpClient(),
+       _sourceResolver = sourceResolver ?? storyResourceSources;
+  final StorySourceResolver _sourceResolver;
+  List<Uri> sourcesFor(String url) => _sourceResolver(Uri.parse(url));
   final Directory root;
   final ManifestResolver resolveManifest;
   final VoidCallback? cancelManifest;
@@ -247,11 +252,39 @@ class NativeDownloads extends ChangeNotifier {
     File destination,
     ChapterDownload task,
   ) async {
-    final uri = Uri.parse(url);
+    Object? failure;
+    for (final uri in sourcesFor(url)) {
+      _check();
+      task.currentBytes = 0;
+      task.currentTotal = null;
+      notifyListeners();
+      try {
+        await _downloadFrom(uri, destination, task);
+        return;
+      } catch (error) {
+        _request?.abort();
+        _check(); // Pause/cancel must not start another source.
+        failure = error;
+      } finally {
+        _request = null;
+        final part = File('${destination.path}.part');
+        if (await part.exists()) await part.delete();
+      }
+    }
+    throw failure ?? StateError('未找到可用资源来源');
+  }
+
+  Future<void> _downloadFrom(
+    Uri uri,
+    File destination,
+    ChapterDownload task,
+  ) async {
     if (uri.scheme != 'https' && !uri.isScheme('http')) {
       throw StateError('Unsupported resource URL');
     }
-    _request = await _client.getUrl(uri).timeout(const Duration(seconds: 30));
+    _request = await _client
+        .getUrl(uri)
+        .timeout(Duration(seconds: isGitHubRaw(uri) ? 8 : 30));
     if (_interrupted || _closed) {
       _request!.abort();
       throw const _Paused();
@@ -261,9 +294,10 @@ class NativeDownloads extends ChangeNotifier {
     // Retain whole completed files on pause. An incomplete file is restarted,
     // avoiding corrupt concatenation when a CDN ignores Range or changes ETag.
     final response = await _request!.close().timeout(
-      const Duration(seconds: 60),
+      Duration(seconds: isGitHubRaw(uri) ? 12 : 60),
     );
     if (response.statusCode != 200) {
+      await response.listen(null).cancel();
       throw HttpException('HTTP ${response.statusCode}', uri: uri);
     }
     final part = File('${destination.path}.part');
