@@ -37,6 +37,7 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
           queryParameters: {
             'script': widget.scriptURL,
             'title': widget.title,
+            'skin': 'archive',
             'preferences': jsonEncode(readerSettings.toJson()),
             'playlist': jsonEncode(
               widget.playlist.map((entry) => entry.toJson()).toList(),

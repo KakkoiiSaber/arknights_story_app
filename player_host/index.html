@@ -4,12 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>剧情阅读</title>
+  <script>document.documentElement.dataset.skin = new URLSearchParams(location.search).get('skin') === 'archive' ? 'archive' : '';</script>
   <link rel="stylesheet" href="./reader-controls.css">
+  <link rel="stylesheet" href="./archive-skin.css">
 </head>
 <body>
   <main>
     <div id="stage" tabindex="0" role="button" aria-label="剧情画面，点击或按空格推进"></div>
-    <div id="overlay"><div class="card"><h2 id="heading">加载中…</h2><p id="status" role="status">正在准备剧情…</p><progress id="progress" max="1" value="0"></progress><button id="retry" hidden>重试</button><p id="hint">点击画面或按空格推进</p></div></div>
+    <div id="overlay" data-phase="loading">
+      <div class="card">
+        <p class="loading-kicker" aria-hidden="true">RODES ISLAND</p>
+        <h2 id="heading">加载中…</h2>
+        <p id="status" role="status">正在准备剧情…</p>
+        <progress id="progress" max="1" value="0" aria-label="剧情加载进度"></progress>
+        <button id="retry" hidden>重试</button>
+        <p id="hint">点击画面或按空格推进</p>
+      </div>
+      <div class="loading-axis" aria-hidden="true"><span class="loading-track from-left"><i></i></span><output id="loading-percent">00%</output><span class="loading-track from-right"><i></i></span></div>
+      <div class="loading-footer" aria-hidden="true"><span>ARKNIGHTS</span></div>
+    </div>
     <nav id="hud" aria-label="阅读控制">
       <button id="return" aria-label="返回故事页" title="返回故事页">←</button>
       <div class="actions">
@@ -17,13 +30,27 @@
         <button id="auto" disabled aria-pressed="false">自动</button>
         <button id="quick" disabled aria-pressed="false">快进</button>
         <button id="speed" hidden aria-label="播放速度">1 档</button>
+        <button id="art-view" disabled aria-label="欣赏美术，隐藏界面" aria-pressed="false" title="隐藏界面，点击画面或按 Esc 恢复"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A12 12 0 0 1 12 5c5.5 0 9 7 9 7a18 18 0 0 1-3.1 4.1M6.1 6.1C3.9 7.8 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.3"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
+        <button id="skip" disabled title="跳过当前剧情">跳过</button>
         <button id="settings" aria-label="阅读设置" title="阅读设置">⚙</button>
         <button id="restart" disabled aria-label="重新阅读" title="重新阅读">↻</button>
       </div>
     </nav>
+    <button id="restore-view" hidden aria-label="恢复故事界面，或按 Esc 返回"></button>
   </main>
+  <dialog id="skip-panel" aria-labelledby="skip-title" aria-describedby="skip-summary skip-question">
+    <div class="skip-content">
+      <div class="skip-heading"><span id="skip-story"></span><h2 id="skip-title">当前剧情</h2></div>
+      <p id="skip-summary"></p>
+      <div class="skip-actions">
+        <button id="skip-cancel" data-close aria-label="取消跳过" title="取消，继续阅读"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 9 14 14M23 9 9 23"/></svg></button>
+        <p id="skip-question">是否跳过剧情？</p>
+        <button id="skip-confirm" aria-label="确认跳过" title="确认跳过"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m7 16 6 6 12-12"/></svg></button>
+      </div>
+    </div>
+  </dialog>
   <dialog id="log-panel" aria-labelledby="log-title">
-    <div class="panel-heading"><h2 id="log-title">剧情记录</h2><button data-close aria-label="关闭记录">×</button></div>
+    <div class="panel-heading"><h2 id="log-title">剧情记录</h2><button data-close aria-label="关闭记录" title="收起记录"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 15 8-8 8 8"/></svg></button></div>
     <div id="log-content" class="panel-content"></div>
   </dialog>
   <dialog id="settings-panel" aria-labelledby="settings-title">

@@ -2,7 +2,7 @@ import { resolveScriptURL } from './source.mjs';
 
 export class StoryQueue {
   constructor(script, serialized) {
-    this.current = {script: resolveScriptURL(script).href, title: ''};
+    this.current = {script: resolveScriptURL(script).href, title: '', summary: '', storyName: ''};
     this.entries = [];
     this.index = -1;
     try {
@@ -12,7 +12,9 @@ export class StoryQueue {
         if (!entry || typeof entry.script !== 'string' || !entry.script.trim())
           throw new Error('Invalid story queue entry');
         return {script: resolveScriptURL(entry.script).href,
-          title: typeof entry.title === 'string' ? entry.title : ''};
+          title: typeof entry.title === 'string' ? entry.title : '',
+          storyName: typeof entry.storyName === 'string' ? entry.storyName : '',
+          summary: typeof entry.summary === 'string' ? entry.summary : ''};
       });
       this.index = this.entries.findIndex(entry => entry.script === this.current.script);
       if (this.index >= 0) this.current = this.entries[this.index];

@@ -39,3 +39,17 @@ test('a finished section advances once; opening a panel restarts the grace perio
   assert.equal(completion.tick(8000, false), false);
   assert.equal(completion.tick(9000, false), true);
 });
+
+
+test('skip confirmation follows the current section summary when advancing', () => {
+  const entries = [
+    {...entry('first'), summary: '第一节简介', storyName: '淬火尘霾'},
+    {...entry('second'), summary: '第二节简介', storyName: '淬火尘霾'},
+  ];
+  const queue = new StoryQueue(entries[0].script, JSON.stringify(entries));
+  assert.equal(queue.current.summary, '第一节简介');
+  queue.advance();
+  assert.equal(queue.current.summary, '第二节简介');
+  assert.equal(queue.current.storyName, '淬火尘霾');
+  assert.equal(new StoryQueue(defaultScript, null).current.summary, '');
+});

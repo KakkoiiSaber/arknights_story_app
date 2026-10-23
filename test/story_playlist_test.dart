@@ -36,4 +36,16 @@ void main() {
       });
     },
   );
+  test('player receives archive name and synopsis for skip confirmation', () {
+    final playlist = StoryPlaylistEntry.fromReview([
+      {
+        'storyTxt': 'obt/main/level_01_beg',
+        'storyCode': '0-1',
+        'storyName': '坍塌',
+        'storyDesc': '章节简介',
+      },
+    ], archiveName: '序章');
+    expect(playlist.single.toJson()['summary'], '章节简介');
+    expect(playlist.single.toJson()['storyName'], '序章');
+  });
 }

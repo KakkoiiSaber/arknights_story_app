@@ -34,3 +34,39 @@ output { color: #aeb7c1; }
 @media (max-height: 500px) { #hud { padding-top: max(6px, env(safe-area-inset-top)); } button { min-height: 36px; padding: 6px 10px; } .panel-content { padding-top: 4px; } form label { margin-top: 10px; } }
 @media (orientation: portrait) { #hint::after { content: ' · 横屏观看效果更好'; } }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+
+/* Art appreciation mode: first click restores UI without advancing the story. */
+.art-view #hud { opacity: 0; pointer-events: none; }
+#restore-view { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; border: 0; padding: 0; background: transparent; cursor: pointer; }
+#restore-view:hover { background: transparent; }
+#restore-view:focus-visible { outline: 1px solid #ffffff40; outline-offset: -4px; }
+
+#skip-panel { width: 100%; max-width: 100%; max-height: calc(100dvh - 40px); border: 0; background: #050708bf; backdrop-filter: none; }
+#skip-panel::backdrop { background: #0003; }
+.skip-content { padding: clamp(24px, 5vh, 54px) 0; text-align: center; }
+.skip-heading { display:flex; align-items:baseline; justify-content:center; flex-wrap:wrap; gap:10px 18px; padding:0 24px; }
+#skip-story { color:#b6bdbc; font-size:clamp(16px,2.1vw,26px); }
+#skip-title { margin: 0; max-width: 1000px; font-size: clamp(17px, 2.2vw, 27px); font-weight: 500; letter-spacing: .05em; }
+#skip-summary { margin: clamp(24px, 6vh, 64px) auto; max-width: 980px; padding:0 32px; line-height: 1.9; font-size: clamp(14px, 1.7vw, 21px); color: #d7dfdf; white-space: pre-wrap; }
+.skip-actions { position:relative; display: flex; align-items: center; justify-content: center; gap: clamp(24px, 5vw, 72px); margin-top: 32px; }
+.skip-actions::before,.skip-actions::after { content:""; height:1px; background:#bdc4c44d; flex:1 1 0; }
+#skip-question { margin: 0; font-size: clamp(16px, 2vw, 24px); }
+.skip-actions button { border: 2px solid #b8c4c2; border-radius: 50%; padding: 0; width: 44px; height: 44px; flex: 0 0 44px; display:grid; place-items:center; font-size: 30px; line-height: 1; background: transparent; }
+.skip-actions button:hover { background: #dbe5ce; color: #16201b; }
+
+#log-content { font-size: calc(16px * var(--log-font-scale, 1)); }
+
+.skip-actions button svg { width:30px; height:30px; fill:none; stroke:currentColor; stroke-width:3; stroke-linecap:square; stroke-linejoin:miter; display:block; }
+
+#skip-panel[open]::backdrop, #settings-panel[open]::backdrop { animation: reader-backdrop-in 220ms ease-out both; }
+#skip-panel[data-closing]::backdrop, #settings-panel[data-closing]::backdrop { animation: reader-backdrop-out 220ms ease-in both; }
+@keyframes reader-backdrop-in { from { opacity:0; } to { opacity:1; } }
+@keyframes reader-backdrop-out { from { opacity:1; } to { opacity:0; } }
+@media(prefers-reduced-motion:reduce) { #skip-panel[open]::backdrop, #settings-panel[open]::backdrop { animation:none; } }
+
+/* Translate child content inside a clipped shell, never a scrolling dialog. */
+#skip-panel, #settings-panel { overflow: hidden; }
+#skip-panel .skip-content { max-height: calc(100dvh - 40px); overflow-y: auto; }
+#settings-panel .panel-content { max-height: calc(100dvh - 140px); }
+#skip-panel .skip-content, #settings-panel .panel-content { scrollbar-width: none; }
+#skip-panel .skip-content::-webkit-scrollbar, #settings-panel .panel-content::-webkit-scrollbar { display: none; }

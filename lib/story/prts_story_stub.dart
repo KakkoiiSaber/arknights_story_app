@@ -133,6 +133,7 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
                               title: widget.title,
                             )
                             .queryParameters,
+                        'skin': 'archive',
                         'preferences': jsonEncode(readerSettings.toJson()),
                         'playlist': jsonEncode(
                           widget.playlist

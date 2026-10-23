@@ -1,7 +1,7 @@
 name: arknights_story_app
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.1.5+1
+version: 0.1.6+1
 
 environment:
   sdk: ^3.9.2
@@ -42,6 +42,25 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Archive Sans
+      fonts:
+        - asset: lib/assets/fonts/NotoSansSC.ttf
+          weight: 400
+        - asset: lib/assets/fonts/NotoSansSC.ttf
+          weight: 500
+        - asset: lib/assets/fonts/NotoSansSC.ttf
+          weight: 600
+        - asset: lib/assets/fonts/NotoSansSC.ttf
+          weight: 700
+    - family: Archive Condensed
+      fonts:
+        - asset: lib/assets/fonts/BarlowCondensed-Medium.ttf
+          weight: 500
+        - asset: lib/assets/fonts/BarlowCondensed-SemiBold.ttf
+          weight: 600
   assets:
     - lib/assets/data/story_themes.json
+    - lib/assets/fonts/NotoSansSC-OFL.txt
+    - lib/assets/fonts/BarlowCondensed-OFL.txt
     - lib/assets/prts_player.zip

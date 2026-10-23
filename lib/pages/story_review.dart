@@ -16,11 +16,15 @@ import '../story/story_script.dart' show storyTxtPath;
 class StoryReviewPage extends StatefulWidget {
   final String storyId;
   final String? titleImageId;
+  final String? storyDate;
+  final String? storyType;
   final Duration fadeDuration;
   const StoryReviewPage({
     super.key,
     required this.storyId,
     this.titleImageId,
+    this.storyDate,
+    this.storyType,
     this.fadeDuration = const Duration(milliseconds: 1000),
   });
 
@@ -72,6 +76,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     String? storyCode,
     String? storyTag,
   }) async {
+    if (_readingStory) return;
     _readingStory = true;
     await _stopAllAudio();
     if (!mounted) return;
@@ -80,7 +85,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         context,
         (_) => StoryPage(
           storyTxtPath: storyTxt,
-          playlist: StoryPlaylistEntry.fromReview(infoUnlockDatas),
+          playlist: StoryPlaylistEntry.fromReview(
+            infoUnlockDatas,
+            archiveName: name ?? '',
+          ),
           storyName: storyName,
           storyCode: storyCode,
           storyTag: storyTag,
@@ -330,18 +338,38 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     ),
   );
 
-  Widget _details({required bool compact}) => Column(
+  Widget _recordLabel() => Text(
+    'ARKNIGHTS / ${name ?? widget.storyId}',
+    textAlign: TextAlign.right,
+    style: const TextStyle(
+      fontFamily: 'Archive Condensed',
+      fontSize: 11,
+      letterSpacing: 1.3,
+      color: ArchiveStyle.muted,
+    ),
+  );
+
+  Widget _details({
+    required bool compact,
+    bool showRecordLabel = true,
+  }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
+      if (showRecordLabel) ...[
+        Align(alignment: Alignment.centerRight, child: _recordLabel()),
+        SizedBox(height: compact ? 14 : 24),
+      ],
       if (_titleProvider != null)
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 300, maxHeight: 160),
-          child: Image(
-            image: _titleProvider!,
-            width: 280,
-            fit: BoxFit.contain,
-            alignment: Alignment.centerLeft,
-            errorBuilder: (_, _, _) => _name(),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 340, maxHeight: 180),
+            child: Image(
+              image: _titleProvider!,
+              width: 280,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              errorBuilder: (_, _, _) => _name(),
+            ),
           ),
         )
       else
@@ -358,6 +386,21 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         ),
         const SizedBox(height: 26),
       ],
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('章节目录', style: TextStyle(fontSize: 18, letterSpacing: 2)),
+          Text(
+            '${infoUnlockDatas.length} RECORDS',
+            style: const TextStyle(
+              fontSize: 10,
+              letterSpacing: 1,
+              color: ArchiveStyle.muted,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 18),
       if (infoUnlockDatas.isNotEmpty)
         ChapterDownloadButton(
           storyId: 'story:${Database.storyContentPath}:${widget.storyId}',
@@ -416,16 +459,25 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
   Widget _controls() => SafeArea(
     child: Padding(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Material(
-            color: Colors.black.withValues(alpha: 0.5),
-            child: IconButton(
-              tooltip: '返回故事库',
-              onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.arrow_back, size: 21),
+            color: const Color(0xb8121719),
+            child: InkWell(
+              onTap: () => Navigator.of(context).maybePop(),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.chevron_left, size: 23),
+                    SizedBox(width: 12),
+                    Text('返回', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -448,90 +500,136 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         final infoWidth = constraints.maxWidth * 0.40;
         final artHeight = (constraints.maxWidth * 0.68).clamp(250.0, 340.0);
         final hasData = !_loading && _story != null;
-        return Stack(
-          children: [
-            if (wide && _backgroundUrls.isNotEmpty) ...[
-              Positioned.fill(child: _artwork()),
-              Positioned.fill(child: _gradient(wide: true)),
-            ],
-            if (hasData)
-              if (wide)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SafeArea(
-                    left: false,
-                    child: SizedBox(
-                      width: infoWidth,
-                      height: double.infinity,
-                      child: Scrollbar(
-                        controller: _scroll,
-                        child: SingleChildScrollView(
+        return ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+          child: Stack(
+            children: [
+              if (wide && _backgroundUrls.isNotEmpty) ...[
+                Positioned.fill(child: _artwork()),
+                Positioned.fill(child: _gradient(wide: true)),
+              ],
+              if (hasData)
+                if (wide)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SafeArea(
+                      left: false,
+                      child: SizedBox(
+                        width: infoWidth,
+                        height: double.infinity,
+                        child: Scrollbar(
                           controller: _scroll,
-                          key: PageStorageKey('story-info-${widget.storyId}'),
-                          padding: EdgeInsets.fromLTRB(
-                            22,
-                            compact ? 54 : 64,
-                            24,
-                            32,
+                          child: SingleChildScrollView(
+                            controller: _scroll,
+                            key: PageStorageKey('story-info-${widget.storyId}'),
+                            padding: EdgeInsets.fromLTRB(
+                              22,
+                              compact ? 16 : 26,
+                              24,
+                              32,
+                            ),
+                            child: _details(compact: compact),
                           ),
-                          child: _details(compact: compact),
                         ),
                       ),
                     ),
-                  ),
-                )
-              else
-                Scrollbar(
-                  controller: _scroll,
-                  child: SingleChildScrollView(
+                  )
+                else
+                  Scrollbar(
                     controller: _scroll,
+                    child: SingleChildScrollView(
+                      controller: _scroll,
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: artHeight,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                _artwork(),
+                                _gradient(wide: false),
+                                Positioned(
+                                  top: 28,
+                                  right: 24,
+                                  child: _recordLabel(),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SafeArea(
+                            top: false,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                              child: _details(
+                                compact: false,
+                                showRecordLabel: false,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              if (_loading)
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              if (_error != null && !hasData)
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        '故事加载失败',
+                        style: TextStyle(color: ArchiveStyle.muted),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _loading = true;
+                            _error = null;
+                          });
+                          _loadStory();
+                        },
+                        child: const Text('重试'),
+                      ),
+                    ],
+                  ),
+                ),
+              if (wide)
+                Positioned(
+                  left: 40,
+                  bottom: 30,
+                  child: SafeArea(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          height: artHeight,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [_artwork(), _gradient(wide: false)],
+                        Text(
+                          switch (widget.storyType) {
+                            'MAIN_STORY' => 'MAIN STORY',
+                            'MINI_STORY' => 'STORY COLLECTION',
+                            _ => 'SIDE STORY',
+                          },
+                          style: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1.4,
+                            color: ArchiveStyle.muted,
                           ),
                         ),
-                        SafeArea(
-                          top: false,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                            child: _details(compact: false),
+                        const SizedBox(height: 8),
+                        Text(
+                          (widget.storyDate ?? '').replaceAll('-', ' / '),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: ArchiveStyle.muted,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-            if (_loading)
-              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            if (_error != null && !hasData)
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      '故事加载失败',
-                      style: TextStyle(color: ArchiveStyle.muted),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _loading = true;
-                          _error = null;
-                        });
-                        _loadStory();
-                      },
-                      child: const Text('重试'),
-                    ),
-                  ],
-                ),
-              ),
-            Positioned(top: 0, left: 0, right: 0, child: _controls()),
-          ],
+              Positioned(top: 0, left: 0, right: 0, child: _controls()),
+            ],
+          ),
         );
       },
     ),

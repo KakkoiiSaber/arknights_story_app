@@ -147,3 +147,15 @@ story data and assets:
 utils
 [poster](https://prts.wiki/w/%E5%AE%98%E6%96%B9%E5%AE%A3%E4%BC%A0%E5%9B%BE%E4%B8%80%E8%A7%88)
 [assetsguide](https://github.com/isHarryh/Ark-Unpacker/blob/v4.x/docs/AssetsGuide.md)
+
+
+### 档案馆界面（D 稿移植）
+
+实际 Flutter 首页采用“方舟档案馆 RECORDS”固定页头与页脚，中间目录独立滚动。保留全部、主线、活动、故事集、联动五个筛选与搜索，按实际元数据分组展示封面与日期。详情页保留左侧场景、右侧原版标题图、简介、章节介绍与下载入口；窄屏采用纵向布局。
+
+Web iframe 与原生 WebView 均启用 `skin=archive`，共用 `player_host/` 中的播放器界面与过渡动画。章节播放列表携带故事名和小节简介用于跳过确认。更新播放器后运行 `dart run tool/package_player.dart` 重建原生资源包；Web 构建后运行 `npm run stage:player` 同步播放器静态文件。
+
+
+D 稿字体随 App 打包：`lib/assets/fonts/` 内含 Noto Sans SC（可变字重）与 Barlow Condensed，目录中的 OFL 文本保留字体授权。首页字号、标题基线、分组标识及封面反馈以 `design_drafts/industrial/fusion.css`、`fusion-review.css` 为参照。
+
+本地 Web 预览使用 `python tool/serve_preview.py`（端口 8766）。该开发服务器只在预览入口清理此来源下 Flutter 的离线缓存，避免反复构建后仍显示旧 UI；不会改动生产构建文件。构建后仍需运行 `npm run stage:player`。

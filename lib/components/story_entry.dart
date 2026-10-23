@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -14,10 +15,12 @@ class StoryEntry extends StatefulWidget {
     required this.titleImage,
     required this.onTap,
     this.height = 128,
+    this.framed = false,
     this.maxWidth = double.infinity,
     this.aspectRatio = 632 / 456,
   });
 
+  final bool framed;
   final String name;
   final ImageProvider? kvImage;
   final ImageProvider? titleImage;
@@ -37,6 +40,7 @@ class _StoryEntryState extends State<StoryEntry> {
   bool _visible = false;
   bool _hovered = false;
   bool _focused = false;
+  bool _pressed = false;
   bool _failed = false;
   late final Key _visibilityKey = UniqueKey();
 
@@ -94,12 +98,56 @@ class _StoryEntryState extends State<StoryEntry> {
     super.dispose();
   }
 
+  Widget _artwork(double width, double height) => SizedBox(
+    width: width,
+    height: height,
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        if (_visible && widget.kvImage != null && !_failed)
+          Image(
+            image: widget.kvImage!,
+            fit: BoxFit.contain,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => _fallback(),
+          )
+        else if (_failed || widget.kvImage == null)
+          _fallback(),
+        if (_visible && widget.titleImage != null && !_failed)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: FractionallySizedBox(
+              widthFactor: .92,
+              heightFactor: .52,
+              child: Image(
+                image: widget.titleImage!,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomCenter,
+                frameBuilder: (context, child, frame, synchronous) =>
+                    TweenAnimationBuilder<double>(
+                      key: ValueKey(widget.titleImage),
+                      tween: Tween(begin: 0, end: frame == null ? 0 : 1),
+                      duration: ArchiveStyle.motion(context, 300),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, opacity, child) =>
+                          Opacity(opacity: opacity, child: child),
+                      child: child,
+                    ),
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final ratio = _ratio ?? widget.aspectRatio;
     final width = math.min(widget.height * ratio, widget.maxWidth);
     final height = math.min(widget.height, width / ratio);
     final highlighted = _hovered || _focused;
+    final ready = _ratio != null || _failed || widget.kvImage == null;
     return VisibilityDetector(
       key: _visibilityKey,
       onVisibilityChanged: (info) {
@@ -123,59 +171,103 @@ class _StoryEntryState extends State<StoryEntry> {
                 onTap: widget.onTap,
                 onHover: (value) => setState(() => _hovered = value),
                 onFocusChange: (value) => setState(() => _focused = value),
+                onHighlightChanged: (value) => setState(() => _pressed = value),
+                splashFactory: NoSplash.splashFactory,
                 hoverColor: Colors.transparent,
-                highlightColor: Colors.white.withValues(alpha: 0.04),
-                child: Stack(
+                highlightColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                child: Align(
                   alignment: Alignment.bottomCenter,
-                  children: [
-                    AnimatedSlide(
-                      offset: highlighted
-                          ? const Offset(0, -0.02)
-                          : Offset.zero,
-                      duration: ArchiveStyle.motion(context, 200),
-                      child: SizedBox(
-                        height: height,
-                        width: width,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            if (_visible && widget.kvImage != null && !_failed)
-                              Image(
-                                image: widget.kvImage!,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                                errorBuilder: (_, _, _) => _fallback(),
-                              )
-                            else if (_failed || widget.kvImage == null)
-                              _fallback(),
-                            if (_visible &&
-                                widget.titleImage != null &&
-                                !_failed)
-                              Align(
-                                alignment: Alignment.bottomCenter,
-                                child: FractionallySizedBox(
-                                  widthFactor: 0.92,
-                                  heightFactor: 0.52,
-                                  child: Image(
-                                    image: widget.titleImage!,
-                                    fit: BoxFit.contain,
-                                    alignment: Alignment.bottomCenter,
-                                    errorBuilder: (_, _, _) =>
-                                        const SizedBox.shrink(),
+                  child: AnimatedScale(
+                    scale: _pressed
+                        ? 1.006
+                        : highlighted
+                        ? 1.018
+                        : 1,
+                    duration: ArchiveStyle.motion(
+                      context,
+                      _pressed ? 120 : 300,
+                    ),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedOpacity(
+                      opacity: ready ? 1 : 0,
+                      duration: ArchiveStyle.motion(context, 360),
+                      curve: Curves.easeOutCubic,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: highlighted ? 1 : 0),
+                        duration: ArchiveStyle.motion(context, 300),
+                        curve: Curves.easeOut,
+                        builder: (context, value, child) {
+                          final brightness = 1 + value * .09;
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              if (value > 0 && ready)
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: Opacity(
+                                      opacity: value * .14,
+                                      child: ImageFiltered(
+                                        imageFilter: ui.ImageFilter.blur(
+                                          sigmaX: 7,
+                                          sigmaY: 7,
+                                        ),
+                                        child: ColorFiltered(
+                                          colorFilter: const ColorFilter.mode(
+                                            Color(0xffdfe5d8),
+                                            BlendMode.srcIn,
+                                          ),
+                                          child: _artwork(width, height),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
+                              ColorFiltered(
+                                colorFilter: ColorFilter.matrix([
+                                  brightness,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  brightness,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  brightness,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  1,
+                                  0,
+                                ]),
+                                child: child,
                               ),
-                          ],
-                        ),
+                              if (_focused)
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: ArchiveStyle.accent,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                        child: _artwork(width, height),
                       ),
                     ),
-                    if (highlighted)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: CustomPaint(painter: _CoverCorners()),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -195,31 +287,4 @@ class _StoryEntryState extends State<StoryEntry> {
       ),
     ),
   );
-}
-
-class _CoverCorners extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = ArchiveStyle.accent
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(
-      Path()
-        ..moveTo(0, 16)
-        ..lineTo(0, 0)
-        ..lineTo(16, 0),
-      paint,
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(size.width - 16, size.height)
-        ..lineTo(size.width, size.height)
-        ..lineTo(size.width, size.height - 16),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_CoverCorners oldDelegate) => false;
 }

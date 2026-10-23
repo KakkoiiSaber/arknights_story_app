@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class ArchiveStyle {
-  static const background = Color(0xff101113);
-  static const foreground = Color(0xffe9edf0);
-  static const muted = Color(0xffaeb7c1);
-  static const accent = Color(0xff7de2ed);
-  static const line = Color(0x40ffffff);
+  static const background = Color(0xff17191a);
+  static const foreground = Color(0xffe9eceb);
+  static const muted = Color(0xff89989b);
+  static const accent = Color(0xff9bd6dd);
+  static const line = Color(0x26ffffff);
 
   static Duration motion(BuildContext context, [int milliseconds = 260]) =>
       MediaQuery.disableAnimationsOf(context)
@@ -14,6 +14,14 @@ class ArchiveStyle {
 
   static ThemeData get theme => ThemeData(
     brightness: Brightness.dark,
+    fontFamily: 'Archive Sans',
+    textTheme: const TextTheme(
+      bodyMedium: TextStyle(fontVariations: [FontVariation('wght', 400)]),
+      bodyLarge: TextStyle(fontVariations: [FontVariation('wght', 400)]),
+      bodySmall: TextStyle(fontVariations: [FontVariation('wght', 400)]),
+      titleMedium: TextStyle(fontVariations: [FontVariation('wght', 500)]),
+      labelLarge: TextStyle(fontVariations: [FontVariation('wght', 500)]),
+    ),
     useMaterial3: true,
     scaffoldBackgroundColor: background,
     colorScheme: const ColorScheme.dark(
@@ -24,7 +32,9 @@ class ArchiveStyle {
     dividerColor: line,
     splashFactory: InkRipple.splashFactory,
     scrollbarTheme: const ScrollbarThemeData(
-      thickness: WidgetStatePropertyAll(3),
+      thickness: WidgetStatePropertyAll(0),
+      thumbVisibility: WidgetStatePropertyAll(false),
+      trackVisibility: WidgetStatePropertyAll(false),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
@@ -58,3 +68,47 @@ Route<T> archiveRoute<T>(BuildContext context, WidgetBuilder builder) =>
         );
       },
     );
+
+/// Subtle faceted canvas shared by the archive shell, without image downloads.
+class ArchiveBackdrop extends StatelessWidget {
+  const ArchiveBackdrop({super.key, required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(painter: _ArchiveFacets(), child: child);
+}
+
+class _ArchiveFacets extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = ArchiveStyle.background,
+    );
+    final paint = Paint()..color = const Color(0x14000000);
+    for (final points in [
+      [
+        const Offset(.03, 0),
+        const Offset(.38, 0),
+        const Offset(.92, 1),
+        const Offset(.57, 1),
+      ],
+      [
+        const Offset(.72, 0),
+        const Offset(1, 0),
+        const Offset(.42, 1),
+        const Offset(.1, 1),
+      ],
+    ]) {
+      final path = Path()
+        ..moveTo(points.first.dx * size.width, points.first.dy * size.height);
+      for (final point in points.skip(1)) {
+        path.lineTo(point.dx * size.width, point.dy * size.height);
+      }
+      canvas.drawPath(path..close(), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

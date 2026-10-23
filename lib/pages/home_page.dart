@@ -16,19 +16,30 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   late Future<dynamic> _storyMetaFuture;
   late Future<dynamic> _homeAudioFuture;
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
   StoryTypeFilter _filter = StoryTypeFilter.all;
   bool _searchOpen = false;
+  late final AnimationController _categoryMotion;
+  StoryTypeFilter _catalogFilter = StoryTypeFilter.all;
+  bool _switchingOut = false;
+  int _filterRevision = 0;
   String? _reviewRevision;
   MusicScope? _music;
 
   @override
   void initState() {
     super.initState();
+    _categoryMotion = AnimationController(
+      vsync: this,
+      value: 1,
+      duration: const Duration(milliseconds: 250),
+      reverseDuration: const Duration(milliseconds: 110),
+    );
     _reviewRevision = reviewAssets.revision;
     reviewAssets.addListener(_reviewUpdated);
     _storyMetaFuture = DataRetriever.getJsonFromURL(
@@ -102,147 +113,272 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     reviewAssets.removeListener(_reviewUpdated);
     _music?.close();
+    _categoryMotion.dispose();
     _search.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    const filters = StoryTypeFilter.values;
-    const labels = ['全部', '主线', '活动', '故事集', '联动'];
-    final padding = MediaQuery.sizeOf(context).width < 600 ? 18.0 : 28.0;
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(padding, 10, padding - 8, 4),
-              child: Row(
-                children: [
-                  Transform(
-                    transform: Matrix4.skewX(-0.2),
-                    child: Container(
-                      width: 5,
-                      height: 20,
-                      color: ArchiveStyle.foreground,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      '故事库',
-                      style: TextStyle(
-                        fontSize: 23,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: _searchOpen ? '关闭搜索' : '搜索故事',
-                    onPressed: _toggleSearch,
-                    icon: Icon(
-                      _searchOpen ? Icons.close : Icons.search,
-                      size: 21,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '设置',
-                    onPressed: () async {
-                      await Navigator.of(context).push(
-                        archiveRoute(context, (_) => const SettingsPage()),
-                      );
-                      if (mounted && _music?.isCurrent != true) {
-                        _playHomeMusic();
-                      }
-                    },
-                    icon: const Icon(Icons.settings_outlined, size: 21),
-                  ),
-                ],
-              ),
-            ),
-            ReviewDownloadPanel(compact: true, onRetry: _retryCatalog),
-            AnimatedSize(
-              duration: ArchiveStyle.motion(context, 200),
-              curve: Curves.easeOutCubic,
-              child: _searchOpen
-                  ? Padding(
-                      padding: EdgeInsets.symmetric(horizontal: padding),
-                      child: TextField(
-                        controller: _search,
-                        focusNode: _searchFocus,
-                        onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          hintText: '搜索故事',
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 14),
-                          border: UnderlineInputBorder(),
-                        ),
-                      ),
-                    )
-                  : const SizedBox(width: double.infinity),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(padding, 4, padding, 12),
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: ArchiveStyle.line, width: 0.5),
+  Future<void> _selectFilter(StoryTypeFilter next) async {
+    if (_filter == next) return;
+    final revision = ++_filterRevision;
+    setState(() {
+      _filter = next;
+      _switchingOut = true;
+    });
+    if (MediaQuery.disableAnimationsOf(context)) {
+      setState(() {
+        _catalogFilter = next;
+        _switchingOut = false;
+      });
+      _categoryMotion.value = 1;
+      return;
+    }
+    try {
+      await _categoryMotion.reverse().orCancel;
+    } on TickerCanceled {
+      return;
+    }
+    if (!mounted || revision != _filterRevision) return;
+    setState(() {
+      _catalogFilter = next;
+      _switchingOut = false;
+    });
+    _categoryMotion.forward();
+  }
+
+  Widget _filters() => Wrap(
+    spacing: 22,
+    children: [
+      for (final filter in StoryTypeFilter.values)
+        Semantics(
+          selected: _filter == filter,
+          child: InkWell(
+            onTap: () => _selectFilter(filter),
+            splashFactory: NoSplash.splashFactory,
+            hoverColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: ArchiveStyle.motion(context, 180),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: _filter == filter
+                        ? ArchiveStyle.accent
+                        : Colors.transparent,
+                    width: 2,
                   ),
                 ),
-                child: Row(
+              ),
+              child: Text(
+                const ['全部档案', '主线', '活动', '故事集', '联动'][filter.index],
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _filter == filter
+                      ? ArchiveStyle.foreground
+                      : ArchiveStyle.muted,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
+
+  Widget _searchField() => SizedBox(
+    width: 180,
+    height: 41,
+    child: TextField(
+      controller: _search,
+      focusNode: _searchFocus,
+      onChanged: (_) => setState(() {}),
+      textAlignVertical: TextAlignVertical.center,
+      style: const TextStyle(
+        fontSize: 11,
+        height: 1.5,
+        color: Color(0xffbcc6c7),
+      ),
+      decoration: const InputDecoration(
+        hintText: '检索故事 / SEARCH',
+        hintStyle: TextStyle(
+          fontSize: 11,
+          height: 1.5,
+          color: Color(0xff747e7f),
+        ),
+        prefixIcon: Icon(Icons.search, size: 14),
+        prefixIconConstraints: BoxConstraints(minWidth: 30, minHeight: 41),
+        isDense: true,
+        filled: true,
+        fillColor: Color(0x04ffffff),
+        contentPadding: EdgeInsets.only(right: 12),
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 950;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final padding = screenWidth > 1500
+        ? 60.0
+        : screenWidth <= 750
+        ? 18.0
+        : screenWidth <= 1050
+        ? 24.0
+        : 42.0;
+    return Scaffold(
+      body: ArchiveBackdrop(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                margin: EdgeInsets.fromLTRB(padding, 25, padding, 24),
+                padding: const EdgeInsets.only(top: 8, bottom: 24),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0x1cffffff))),
+                ),
+                child: Column(
                   children: [
-                    for (var i = 0; i < filters.length; i++)
-                      Expanded(
-                        child: Semantics(
-                          selected: _filter == filters[i],
-                          child: InkWell(
-                            onTap: () => setState(() => _filter = filters[i]),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text.rich(
+                            TextSpan(
                               children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  child: Text(
-                                    labels[i],
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: _filter == filters[i]
-                                          ? ArchiveStyle.foreground
-                                          : ArchiveStyle.muted,
-                                    ),
+                                TextSpan(
+                                  text: '方舟档案馆',
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    height: 1.44,
+                                    fontWeight: FontWeight.w700,
+                                    fontVariations: [
+                                      FontVariation('wght', 700),
+                                    ],
+                                    letterSpacing: 2.56,
                                   ),
                                 ),
-                                AnimatedContainer(
-                                  duration: ArchiveStyle.motion(context, 180),
-                                  width: 28,
-                                  height: 2,
-                                  color: _filter == filters[i]
-                                      ? ArchiveStyle.accent
-                                      : Colors.transparent,
+                                WidgetSpan(child: SizedBox(width: 18)),
+                                TextSpan(
+                                  text: 'RECORDS',
+                                  style: TextStyle(
+                                    fontFamily: 'Archive Condensed',
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 19,
+                                    letterSpacing: 2.28,
+                                    color: ArchiveStyle.muted,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                         ),
+                        if (wide) ...[
+                          _filters(),
+                          const SizedBox(width: 28),
+                          _searchField(),
+                        ],
+                        if (!wide)
+                          IconButton(
+                            tooltip: '搜索故事',
+                            onPressed: _toggleSearch,
+                            icon: const Icon(Icons.search, size: 20),
+                          ),
+                        IconButton(
+                          tooltip: '设置',
+                          icon: const Icon(Icons.settings_outlined, size: 20),
+                          onPressed: () async {
+                            await Navigator.of(context).push(
+                              archiveRoute(
+                                context,
+                                (_) => const SettingsPage(),
+                              ),
+                            );
+                            if (mounted && _music?.isCurrent != true) {
+                              _playHomeMusic();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    if (!wide)
+                      Align(alignment: Alignment.centerLeft, child: _filters()),
+                    if (!wide && _searchOpen)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _searchField(),
                       ),
                   ],
                 ),
               ),
-            ),
-            Expanded(
-              child: StoryDashboard(
-                storyMetaTableFuture: _storyMetaFuture,
-                filter: _filter,
-                query: _search.text,
-                onStoryClosed: _playHomeMusic,
-                onRetry: _retryCatalog,
+              ReviewDownloadPanel(compact: true, onRetry: _retryCatalog),
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: _categoryMotion,
+                  builder: (context, child) {
+                    final value = Curves.easeOutCubic.transform(
+                      _categoryMotion.value,
+                    );
+                    return IgnorePointer(
+                      ignoring: _switchingOut,
+                      child: Opacity(
+                        opacity: value,
+                        child: Transform.translate(
+                          offset: Offset(
+                            0,
+                            (1 - value) * (_switchingOut ? -6 : 10),
+                          ),
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: StoryDashboard(
+                    storyMetaTableFuture: _storyMetaFuture,
+                    filter: _catalogFilter,
+                    query: _search.text,
+                    onStoryClosed: _playHomeMusic,
+                    onRetry: _retryCatalog,
+                  ),
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: EdgeInsets.fromLTRB(padding, 10, padding, 14),
+                child: Container(
+                  padding: const EdgeInsets.only(top: 12),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: ArchiveStyle.line)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'ARKNIGHTS / UNOFFICIAL ARCHIVE',
+                        style: TextStyle(
+                          fontFamily: 'Archive Condensed',
+                          fontSize: 10,
+                          letterSpacing: 1,
+                          color: ArchiveStyle.muted,
+                        ),
+                      ),
+                      Text(
+                        'RECORDS OF OUR TIME  +',
+                        style: TextStyle(
+                          fontFamily: 'Archive Condensed',
+                          fontSize: 10,
+                          letterSpacing: 1,
+                          color: ArchiveStyle.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

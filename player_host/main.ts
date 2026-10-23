@@ -1,6 +1,7 @@
 import { sound } from '@pixi/sound';
 import { installAudioLifecycle } from './audio-lifecycle.mjs';
 import { ReaderControls } from './reader-controls';
+import { notifyHost } from './host-bridge';
 import { StoryQueue, CompletionTransition } from './story-queue.mjs';
 import { loadContextByScript } from '../third_party/prts-widgets/src/widgets/StoryPlayer/context';
 import { createStoryPlayer } from '../third_party/prts-widgets/src/widgets/StoryPlayer/engine/createStoryPlayer';
@@ -20,8 +21,20 @@ const progress = element<HTMLProgressElement>('progress');
 const retry = element<HTMLButtonElement>('retry');
 const restart = element<HTMLButtonElement>('restart');
 const query = new URLSearchParams(location.search);
+const archiveSkin = query.get('skin') === 'archive';
+const loadingPercent = element<HTMLOutputElement>('loading-percent');
+function setLoadingProgress(value: number) {
+  const normalized = Math.max(0, Math.min(1, value));
+  progress.value = normalized;
+  overlay.style.setProperty('--load-progress', String(normalized));
+  loadingPercent.textContent = `${Math.round(normalized * 100).toString().padStart(2, '0')}%`;
+}
 installReaderPreferences(query);
-const controls = new ReaderControls();
+const controls = new ReaderControls(skipStory, () => ({
+  title: queue?.current.title || query.get('title') || '当前剧情',
+  storyName: queue?.current.storyName || query.get('storyName') || '',
+  summary: queue?.current.summary || query.get('summary') || '',
+}));
 installNativeDelivery();
 stage.dataset.resources = 'prts';
 let player: StoryPlayer | null = null;
@@ -42,6 +55,7 @@ function fail(error: unknown) {
   console.error('[PRTS host]', error);
   ready = false;
   overlay.hidden = false;
+  overlay.dataset.phase = 'error';
   heading.textContent = '剧情加载失败';
   status.textContent = error instanceof Error ? error.message : String(error);
   progress.hidden = true;
@@ -61,10 +75,11 @@ async function load(continuing = false) {
   player?.destroy();
   player = null;
   overlay.hidden = false;
-  heading.textContent = '加载中…';
+  overlay.dataset.phase = 'loading';
+  heading.textContent = archiveSkin ? '正在释放神经递质' : '加载中…';
   status.textContent = '正在准备剧情…';
   progress.hidden = false;
-  progress.value = 0;
+  setLoadingProgress(0);
   retry.hidden = true;
   restart.disabled = true;
   try {
@@ -83,12 +98,15 @@ async function load(continuing = false) {
     if (!response.ok) throw new Error(`剧情 TXT: HTTP ${response.status}`);
     const script = await response.text();
     if (!script.trim()) throw new Error('剧情 TXT 为空');
+    setLoadingProgress(0.12);
+    status.textContent = '正在解析剧情与资源映射…';
     const context = await Promise.race([
       loadContextByScript(script),
       new Promise<never>((_, reject) => setTimeout(() => reject(
         new Error('PRTS 资源映射加载超时，请重试。')), 45000)),
     ]);
     if (current !== generation || disposed) return;
+    setLoadingProgress(0.24);
     const lines = parseScript(context.script);
     const windowContext = (line: number) => {
       const script = loadingWindow(context.script, lines, line);
@@ -107,11 +125,12 @@ async function load(continuing = false) {
     try {
       await preloadContextAssets(windowContext(1), value => {
         if (current !== generation || disposed) return;
-        progress.value = value;
+        setLoadingProgress(0.24 + Math.max(0, Math.min(1, value)) * 0.68);
         status.textContent = `正在加载开场资源 ${Math.round(value * 100)}%`;
       });
     } finally { clearTimeout(timeout); }
     if (current !== generation || disposed) return;
+    setLoadingProgress(0.96);
     player = createStoryPlayer(context);
     await player.mount(stage);
     if (current !== generation || disposed) { player?.destroy(); player = null; return; }
@@ -123,7 +142,7 @@ async function load(continuing = false) {
     ready = true;
     const loadMs = Math.round(performance.now() - started);
     stage.dataset.loadMs = String(loadMs);
-    progress.value = 1;
+    setLoadingProgress(1);
     restart.disabled = false;
     let pendingLine: number | null = null;
     let warming = false;
@@ -182,6 +201,15 @@ stage.addEventListener('keydown', event => {
   }
 });
 restart.onclick = () => { void load(); };
+async function skipStory() {
+  if (!ready || !player || disposed || controls.modalOpen || !overlay.hidden) return;
+  try {
+    if (player.canSkipNode()) await player.skipNode();
+    else if (queue.next) nextSection();
+    else await notifyHost('exit');
+  } catch (error) { fail(error); }
+}
+
 function nextSection() {
   if (!ready || disposed || controls.modalOpen || !queue.advance()) return;
   void load(true);
@@ -194,6 +222,7 @@ const poll = setInterval(() => {
     if (!finishShown) {
       finishShown = true;
       overlay.hidden = false;
+      overlay.dataset.phase = 'complete';
       heading.textContent = queue.isStoryEnd ? '整部故事已结束' : '本节故事结束';
       status.textContent = queue.next ? `即将进入下一节：${queue.next.title || '下一节'}` : '可以重新阅读，或返回故事页。';
       progress.hidden = true;

@@ -31,8 +31,8 @@ void main() {
   testWidgets(
     'square and banner retain full source proportions at equal heights',
     (tester) async {
-    final square = MemoryImage((await tester.runAsync(() => png(64, 64)))!);
-    final banner = MemoryImage((await tester.runAsync(() => png(192, 64)))!);
+      final square = MemoryImage((await tester.runAsync(() => png(64, 64)))!);
+      final banner = MemoryImage((await tester.runAsync(() => png(192, 64)))!);
       await tester.pumpWidget(
         MaterialApp(
           theme: ArchiveStyle.theme,
@@ -61,11 +61,13 @@ void main() {
       for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-    await tester.runAsync(() => Future.wait([
-      precacheImage(square, tester.element(find.byType(StoryEntry).first)),
-      precacheImage(banner, tester.element(find.byType(StoryEntry).last)),
-    ]));
-    await tester.pumpAndSettle();
+      await tester.runAsync(
+        () => Future.wait([
+          precacheImage(square, tester.element(find.byType(StoryEntry).first)),
+          precacheImage(banner, tester.element(find.byType(StoryEntry).last)),
+        ]),
+      );
+      await tester.pumpAndSettle();
       final images = tester.widgetList<Image>(find.byType(Image)).toList();
       expect(images.length, 2);
       expect(images.every((image) => image.fit == BoxFit.contain), isTrue);
@@ -138,4 +140,40 @@ void main() {
       expect(opened, isTrue);
     },
   );
+  testWidgets('D group numbers and separators survive category filtering', (
+    tester,
+  ) async {
+    final table = {
+      'main_0': {'name': '主线', 'type': 'MAIN_STORY'},
+      'event': {'name': '活动', 'type': 'ACTIVITY_STORY'},
+      'mini': {'name': '故事集', 'type': 'MINI_STORY'},
+    };
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StoryDashboard(storyMetaTableFuture: Future.value(table)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Ⅰ'), findsOneWidget);
+    expect(find.text('Ⅱ'), findsOneWidget);
+    expect(find.text('Ⅲ'), findsOneWidget);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StoryDashboard(
+            storyMetaTableFuture: Future.value(table),
+            filter: StoryTypeFilter.activity,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Ⅱ'), findsOneWidget);
+    expect(find.text('Ⅰ'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
 }
