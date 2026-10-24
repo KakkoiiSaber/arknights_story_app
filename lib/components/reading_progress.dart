@@ -3,15 +3,17 @@ import '../account/reading_library.dart';
 import '../config/archive_style.dart';
 
 class StoryReadingProgress extends StatelessWidget {
-  const StoryReadingProgress({super.key, required this.storyId});
+  const StoryReadingProgress({super.key, required this.storyId, this.library});
   final String storyId;
+  final ReadingLibrary? library;
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: readingLibrary,
+    listenable: library ?? readingLibrary,
     builder: (context, _) {
-      final total = readingLibrary.totalFor(storyId);
-      final done = readingLibrary.completedFor(storyId);
-      final started = readingLibrary.resume(storyId) != null;
+      final total = (library ?? readingLibrary).totalFor(storyId);
+      final done = (library ?? readingLibrary).completedFor(storyId);
+      final started =
+          done > 0 || (library ?? readingLibrary).resume(storyId) != null;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -42,7 +44,14 @@ class StoryReadingProgress extends StatelessWidget {
 String chapterProgressLabel(String script) {
   final value = readingLibrary.chapter(script);
   if (value == null) return '未读';
-  if (value['completed'] == true) return value['atEnd'] == false ? '重读中' : '已读';
+  if (chapterIsRead(value)) {
+    return value['readState'] is Map
+        ? '已读'
+        : value['atEnd'] == false
+        ? '重读中'
+        : '已读';
+  }
+  if (value['readState'] is Map) return '未读';
   if (value['skipped'] == true) return '已跳过';
   return '阅读中 ${(((value['furthest'] as num?) ?? 0) * 100).floor().clamp(0, 99)}%';
 }

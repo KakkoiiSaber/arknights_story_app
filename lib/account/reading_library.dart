@@ -58,11 +58,39 @@ class LibraryRecord {
   );
 }
 
+/// Explicit read/unread choices do not replace playback checkpoints.
+bool chapterIsRead(Map? value) =>
+    value?['readState'] is Map && (value!['readState'] as Map)['read'] is bool
+    ? (value['readState'] as Map)['read'] == true
+    : value?['completed'] == true;
+
+int _nextReadStamp(Map value) {
+  final state = value['readState'];
+  final previous = state is Map
+      ? (state['changedAt'] as num?)?.toInt() ?? 0
+      : 0;
+  final now = DateTime.now().toUtc().microsecondsSinceEpoch;
+  return now > previous ? now : previous + 1;
+}
+
+Map? _latestReadState(Map remote, Map local) {
+  final a = remote['readState'];
+  final b = local['readState'];
+  if (a is! Map) return b is Map ? b : null;
+  if (b is! Map) return a;
+  return ((b['changedAt'] as num?) ?? 0) > ((a['changedAt'] as num?) ?? 0)
+      ? b
+      : a;
+}
+
 Map<String, dynamic> mergeChapter(
   Map<String, dynamic> remote,
   Map<String, dynamic> local,
 ) => {
   ...remote,
+  if (_latestReadState(remote, local) case final state?) 'readState': state,
+  if (remote['chapterCount'] == null && local['chapterCount'] != null)
+    'chapterCount': local['chapterCount'],
   'completed': remote['completed'] == true || local['completed'] == true,
   'skipped': remote['skipped'] == true || local['skipped'] == true,
   if (remote['scriptHash'] == local['scriptHash'])
@@ -89,9 +117,45 @@ class ReadingLibrary extends ChangeNotifier {
   final Map<String, Map<String, LibraryRecord>> _scopes = {};
   final Map<String, List<String>> _catalog = {};
   final Map<String, String> _guestImports = {};
-  int? totalFor(String story) =>
-      _catalog[story]?.length ??
-      (resume(story)?['chapterCount'] as num?)?.toInt();
+  int? totalFor(String story) {
+    final known =
+        _catalog[story]?.length ??
+        (resume(story)?['chapterCount'] as num?)?.toInt();
+    if (known != null) return known;
+    for (final r in records) {
+      if (r.kind == 'chapter' &&
+          r.value['storyId'] == story &&
+          r.value['chapterCount'] is int) {
+        return r.value['chapterCount'] as int;
+      }
+    }
+    return null;
+  }
+
+  /// A batch creates completion metadata only, never a fabricated resume point.
+  void markChapters(
+    String story,
+    Map<String, String> chapters,
+    bool read, {
+    int? chapterCount,
+  }) {
+    if (story.isEmpty || chapters.isEmpty) return;
+    for (final entry in chapters.entries) {
+      final key = chapterKey(entry.key);
+      if (key.isEmpty) continue;
+      final old = chapter(key) ?? {};
+      _put('chapter', key, {
+        ...old,
+        'storyId': story,
+        'chapterId': key,
+        'title': old['title'] ?? entry.value,
+        if (chapterCount != null) 'chapterCount': chapterCount,
+        'readState': {'read': read, 'changedAt': _nextReadStamp(old)},
+      });
+    }
+    _changed();
+  }
+
   void registerStory(String story, Iterable<String> scripts) {
     final ids = scripts.map(chapterKey).toSet().toList();
     if (listEquals(_catalog[story], ids)) return;
@@ -304,6 +368,12 @@ class ReadingLibrary extends ChangeNotifier {
     final fraction = total == 0 ? 0.0 : (line / total).clamp(0.0, 1.0);
     final now = DateTime.now().toUtc().toIso8601String();
     _put('chapter', key, {
+      if (old['readState'] is Map)
+        'readState': payload['completed'] == true && !chapterIsRead(old)
+            ? {'read': true, 'changedAt': _nextReadStamp(old)}
+            : old['readState'],
+      if (payload['chapterCount'] is int || old['chapterCount'] is int)
+        'chapterCount': payload['chapterCount'] ?? old['chapterCount'],
       'storyId': story,
       'chapterId': key,
       'title': '${payload['title'] ?? ''}'.substring(
@@ -340,7 +410,7 @@ class ReadingLibrary extends ChangeNotifier {
         (r) =>
             r.kind == 'chapter' &&
             r.value['storyId'] == story &&
-            r.value['completed'] == true &&
+            chapterIsRead(r.value) &&
             (_catalog[story]?.contains(r.key) ?? true),
       )
       .length;

@@ -166,4 +166,79 @@ void main() {
     library.recordProgress({...progress(), 'line': -1});
     expect(library.chapter('obt/main/a'), null);
   });
+  test('manual read import has totals but never fabricates a checkpoint', () {
+    library.markChapters(
+      'main_0',
+      {'obt/main/a': 'A', 'obt/main/b': 'B'},
+      true,
+      chapterCount: 2,
+    );
+    expect(library.completedFor('main_0'), 2);
+    expect(library.totalFor('main_0'), 2);
+    expect(library.latestResume, isNull);
+    expect(library.chapter('obt/main/a')!['line'], isNull);
+    expect(library.chapter('obt/main/a')!['scriptHash'], isNull);
+    expect(library.getRecord('chapter', 'obt/main/a')!.dirty, true);
+  });
+  test('read/unread toggles preserve scene, choices and resume', () {
+    library.recordProgress(progress(line: 45, done: true));
+    final bookmark = Map.of(library.resume('main_0')!);
+    library.markChapters('main_0', {'obt/main/a': 'A'}, false, chapterCount: 1);
+    expect(library.completedFor('main_0'), 0);
+    expect(library.chapter('obt/main/a')!['completed'], true);
+    expect(library.chapter('obt/main/a')!['line'], 45);
+    expect(library.chapter('obt/main/a')!['choices'], progress()['choices']);
+    expect(library.resume('main_0'), bookmark);
+    library.recordProgress(progress(line: 60));
+    expect(chapterIsRead(library.chapter('obt/main/a')), false);
+    library.recordProgress(progress(line: 100, done: true));
+    expect(chapterIsRead(library.chapter('obt/main/a')), true);
+  });
+  test('older offline completion cannot undo a newer unread choice', () {
+    final remote = {
+      ...progress(line: 70),
+      'completed': true,
+      'readState': {'read': false, 'changedAt': 200},
+    };
+    final local = {
+      ...progress(line: 20, done: true),
+      'readState': {'read': true, 'changedAt': 100},
+    };
+    final merged = mergeChapter(remote, local);
+    expect(chapterIsRead(merged), false);
+    expect(merged['line'], 70);
+    expect(
+      chapterIsRead(
+        mergeChapter(remote, {
+          ...local,
+          'readState': {'read': true, 'changedAt': 300},
+        }),
+      ),
+      true,
+    );
+  });
+  test(
+    'manual status round trips through sync with no resume record',
+    () async {
+      library.markChapters(
+        'main_0',
+        {'obt/main/a': 'A'},
+        true,
+        chapterCount: 1,
+      );
+      final record = library.getRecord('chapter', 'obt/main/a')!;
+      final cloud = {
+        'kind': 'chapter',
+        'key': record.key,
+        'value': Map<String, dynamic>.from(record.value),
+        'revision': 1,
+      };
+      library.acknowledge(cloud, record.edit);
+      await library.switchAccount('second-device');
+      library.receive([cloud]);
+      expect(library.completedFor('main_0'), 1);
+      expect(library.totalFor('main_0'), 1);
+      expect(library.latestResume, isNull);
+    },
+  );
 }

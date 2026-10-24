@@ -13,6 +13,8 @@ class StoryChapterEntry extends StatelessWidget {
     this.last = false,
     this.compact = false,
     this.progressLabel,
+    this.isRead = false,
+    this.onMarkRead,
   });
 
   final String name;
@@ -23,6 +25,8 @@ class StoryChapterEntry extends StatelessWidget {
   final bool last;
   final bool compact;
   final String? progressLabel;
+  final bool isRead;
+  final ValueChanged<bool>? onMarkRead;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -96,6 +100,18 @@ class StoryChapterEntry extends StatelessWidget {
                         ? ArchiveStyle.muted
                         : ArchiveStyle.foreground,
                   ),
+                  if (onMarkRead != null)
+                    PopupMenuButton<bool>(
+                      tooltip: '阅读状态',
+                      icon: const Icon(Icons.more_horiz, size: 20),
+                      onSelected: onMarkRead,
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: !isRead,
+                          child: Text(isRead ? '标记未读' : '标记已读'),
+                        ),
+                      ],
+                    ),
                 ],
               ),
               if (description.isNotEmpty) ...[

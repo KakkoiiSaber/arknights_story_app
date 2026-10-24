@@ -27,10 +27,17 @@ class ReadingSession {
     accountService.sync(pull: false);
   }
 
-  Map<String, dynamic>? checkpoint(String key) =>
-      scope == readingLibrary.scope && chapters.containsKey(key)
-      ? readingLibrary.chapter(key)
-      : null;
+  Map<String, dynamic>? checkpoint(String key) {
+    if (scope != readingLibrary.scope || !chapters.containsKey(key)) {
+      return null;
+    }
+    final value = readingLibrary.chapter(key);
+    // A manual read marker has no scene to restore or script hash to compare.
+    return value?['line'] is num && value?['scriptHash'] is String
+        ? value
+        : null;
+  }
+
   void progress(Map value) {
     if (scope != readingLibrary.scope) return;
     final entry = chapters[value['chapterId']];

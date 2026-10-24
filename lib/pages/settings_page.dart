@@ -9,6 +9,7 @@ import '../story/story_playlist.dart';
 import '../settings/reader_settings_panel.dart';
 import '../components/review_download_panel.dart';
 import 'account_page.dart';
+import 'reading_history_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -88,6 +89,15 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         children: [
           const AccountPanel(),
+          ListTile(
+            leading: const Icon(Icons.fact_check_outlined),
+            title: const Text('阅读记录管理'),
+            subtitle: const Text('批量补录已读故事'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(
+              context,
+            ).push(archiveRoute(context, (_) => const ReadingHistoryPage())),
+          ),
           const ReaderSettingsPanel(),
           const ReviewDownloadPanel(),
           const Text('故事下载', style: TextStyle(fontSize: 21)),
