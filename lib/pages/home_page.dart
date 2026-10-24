@@ -9,6 +9,10 @@ import '../utils/data_retriever.dart';
 import 'settings_page.dart';
 import '../downloads/review_service.dart';
 import '../components/review_download_panel.dart';
+import '../account/account_service.dart';
+import '../account/reading_library.dart';
+import 'account_page.dart';
+import 'story_review.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -287,6 +291,25 @@ class _HomePageState extends State<HomePage>
                             onPressed: _toggleSearch,
                             icon: const Icon(Icons.search, size: 20),
                           ),
+                        ListenableBuilder(
+                          listenable: accountService,
+                          builder: (context, _) => IconButton(
+                            tooltip: '账户',
+                            icon: Icon(
+                              accountService.user == null
+                                  ? Icons.person_outline
+                                  : Icons.person,
+                            ),
+                            onPressed: () => Navigator.of(context).push(
+                              archiveRoute(
+                                context,
+                                (_) => accountService.user == null
+                                    ? const AccountPage()
+                                    : const SettingsPage(),
+                              ),
+                            ),
+                          ),
+                        ),
                         IconButton(
                           tooltip: '设置',
                           icon: const Icon(Icons.settings_outlined, size: 20),
@@ -315,6 +338,38 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
               ReviewDownloadPanel(compact: true, onRetry: _retryCatalog),
+              ListenableBuilder(
+                listenable: readingLibrary,
+                builder: (context, _) {
+                  final saved = readingLibrary.latestResume;
+                  if (saved == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: EdgeInsets.symmetric(horizontal: padding),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.play_arrow, size: 16),
+                        label: Text(
+                          '继续阅读 · ${saved['title'] ?? ''}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            archiveRoute(
+                              context,
+                              (_) => StoryReviewPage(
+                                storyId: saved['storyId'] as String,
+                                resumeOnOpen: true,
+                              ),
+                            ),
+                          );
+                          if (mounted) _playHomeMusic();
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
               Expanded(
                 child: AnimatedBuilder(
                   animation: _categoryMotion,

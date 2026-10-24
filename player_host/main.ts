@@ -1,7 +1,8 @@
 import { sound } from '@pixi/sound';
 import { installAudioLifecycle } from './audio-lifecycle.mjs';
 import { ReaderControls } from './reader-controls';
-import { notifyHost } from './host-bridge';
+import { chapterKey, scriptHash, restorable, choiceMap, resumePrompt, readingNotice } from './reading-progress.mjs';
+import { notifyHost, requestCheckpoint } from './host-bridge';
 import { StoryQueue, CompletionTransition } from './story-queue.mjs';
 import { loadContextByScript } from '../third_party/prts-widgets/src/widgets/StoryPlayer/context';
 import { createStoryPlayer } from '../third_party/prts-widgets/src/widgets/StoryPlayer/engine/createStoryPlayer';
@@ -44,6 +45,30 @@ let disposed = false;
 let queue: StoryQueue;
 const completion = new CompletionTransition();
 let finishShown = false;
+let currentHash = '';
+let sourceLines = 0;
+let restoring = false;
+let skipped = false;
+let lastProgressLine = 0;
+let restoreTimeout: ReturnType<typeof setTimeout> | null = null;
+let restoreVolume: number | null = null;
+function releaseRestoreAudio() {
+  if (restoreVolume !== null) sound.volumeAll = restoreVolume;
+  restoreVolume = null;
+}
+function saveProgress(completed = false) {
+  if (!player || restoring || !queue || !currentHash) return;
+  const position = player.getLogPosition();
+  const line = position.lineIndex ?? lastProgressLine;
+  const atEnd = completed || player.getState() === 'finished';
+  if (!line && !completed && !skipped) return;
+  if (line) lastProgressLine = line;
+  void notifyHost('progress', {
+    chapterId: chapterKey(queue.current.script), title: queue.current.title,
+    line, total: sourceLines, scriptHash: currentHash,
+    choices: position.selections, completed: atEnd && !skipped, atEnd, skipped,
+  }).catch(error => console.warn('[PRTS host] checkpoint save failed', error));
+}
 const audioContext = sound.context.audioContext;
 const playerAudio = installAudioLifecycle({ context: audioContext, stage,
   native: query.get('native') === '1' });
@@ -64,10 +89,14 @@ function fail(error: unknown) {
   retry.onclick = () => { void load(); };
 }
 
-async function load(continuing = false) {
+async function load(continuing = false, allowRestore = true) {
+  releaseRestoreAudio();
+  if (restoreTimeout) clearTimeout(restoreTimeout);
+  restoreTimeout = null;
   const playback = continuing ? player?.getAutoPlayState() : null;
   completion.reset();
   finishShown = false;
+  restoring = false; skipped = false; lastProgressLine = 0; currentHash = '';
   const started = performance.now();
   const current = ++generation;
   ready = false;
@@ -108,6 +137,14 @@ async function load(continuing = false) {
     if (current !== generation || disposed) return;
     setLoadingProgress(0.24);
     const lines = parseScript(context.script);
+    currentHash = await scriptHash(context.script.join('\n'));
+    sourceLines = Math.max(0, ...lines.map(entry => entry.lineNumber));
+    const checkpoint = continuing || !allowRestore ? null : await requestCheckpoint(chapterKey(scriptURL));
+    let restore: Record<string, unknown> | null = null;
+    if (restorable(checkpoint, currentHash, lines) && await resumePrompt(queue.current.title)) restore = checkpoint;
+    else if (checkpoint && checkpoint.atEnd !== true && (!checkpoint.completed || checkpoint.atEnd === false) && checkpoint.scriptHash !== currentHash)
+      readingNotice('剧情内容已更新，本节从开头开始；已读记录仍然保留。');
+    if (current !== generation || disposed) return;
     const windowContext = (line: number) => {
       const script = loadingWindow(context.script, lines, line);
       // Legacy charMap contains chapter-wide references; collect this window
@@ -162,9 +199,15 @@ async function load(continuing = false) {
         }
       } finally { warming = false; }
     };
+    restoring = restore !== null;
     player.onDisplayedLineChange(line => {
       if (current !== generation || disposed) return;
       stage.dataset.line = line?.toString() ?? '';
+      if (line != null) { lastProgressLine = line; saveProgress(); }
+      if (restoring && restore && line != null) {
+        setLoadingProgress(Math.min(1, line / (restore.line as number)));
+        status.textContent = `正在恢复上次阅读位置 ${Math.min(100, Math.round(line / (restore.line as number) * 100))}%`;
+      }
       if (line !== null && line !== undefined && current === generation && !disposed) {
         pendingLine = line;
         void warmAhead();
@@ -176,7 +219,40 @@ async function load(continuing = false) {
           `${entry.kind === 'dialogue' && entry.speaker ? entry.speaker + '：' : ''}${entry.text}，点击继续`);
       }
     });
-    await begin();
+    if (restore) {
+      status.textContent = '正在恢复上次阅读位置…';
+      setLoadingProgress(0);
+      restoreVolume = sound.volumeAll; sound.volumeAll = 0;
+      retry.hidden = false; retry.textContent = '从头阅读';
+      retry.onclick = () => { void load(false, false); };
+      const active = player;
+      let cancelSeek = () => {};
+      const failedRestore = () => {
+        if (current !== generation || disposed) return;
+        // Replay is not reading: never save skipped replay lines as progress.
+        restoring = true;
+        releaseRestoreAudio();
+        active.destroy(); player = null;
+        fail(new Error('无法恢复上次位置，请从本节开头重新阅读。原存档仍然保留。'));
+        retry.onclick = () => { void load(false, false); };
+      };
+      restoreTimeout = setTimeout(() => {
+        cancelSeek(); failedRestore();
+      }, Math.min(300000, Math.max(60000, (restore.line as number) * 120)));
+      cancelSeek = active.seekToLine(restore.line as number, choiceMap(restore.choices as []), update => {
+        if (update.phase === 'seeking') return;
+        if (restoreTimeout) clearTimeout(restoreTimeout);
+        restoreTimeout = null;
+        if (current !== generation || disposed) return;
+        if (update.phase !== 'reached') { failedRestore(); return; }
+        releaseRestoreAudio();
+        restoring = false; active.setAutoPlayMode('default');
+        overlay.hidden = true;
+        saveProgress();
+      });
+      unlockAudio();
+      await active.start();
+    } else await begin();
   } catch (error) { if (current === generation && !disposed) fail(error); }
 }
 
@@ -204,6 +280,7 @@ restart.onclick = () => { void load(); };
 async function skipStory() {
   if (!ready || !player || disposed || controls.modalOpen || !overlay.hidden) return;
   try {
+    skipped = true; saveProgress();
     if (player.canSkipNode()) await player.skipNode();
     else if (queue.next) nextSection();
     else await notifyHost('exit');
@@ -221,6 +298,7 @@ const poll = setInterval(() => {
   if (player.getState() === 'finished') {
     if (!finishShown) {
       finishShown = true;
+      saveProgress(true);
       overlay.hidden = false;
       overlay.dataset.phase = 'complete';
       heading.textContent = queue.isStoryEnd ? '整部故事已结束' : '本节故事结束';
@@ -234,7 +312,11 @@ const poll = setInterval(() => {
   }
 
 }, 100);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveProgress(); });
 window.addEventListener('pagehide', () => {
+  saveProgress();
+  if (restoreTimeout) clearTimeout(restoreTimeout);
+  releaseRestoreAudio();
   disposed = true;
   generation++;
   clearInterval(poll);

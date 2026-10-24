@@ -7,6 +7,7 @@ import '../config/story_themes.dart';
 import '../downloads/review_service.dart';
 import '../pages/story_review.dart';
 import 'story_entry.dart';
+import 'reading_progress.dart';
 
 export '../config/story_catalog.dart' show StoryTypeFilter;
 
@@ -68,35 +69,42 @@ class _StoryDashboardState extends State<StoryDashboard> {
               (title == null
                   ? null
                   : Database.reviewAssetURL(Database.titleImagePath, title));
-    return StoryEntry(
-      key: ValueKey(id),
-      framed: main,
-      name: story['name'] as String? ?? id,
-      kvImage: coverUrl == null ? null : reviewAssets.image(coverUrl),
-      titleImage: titleUrl == null ? null : reviewAssets.image(titleUrl),
-      height: height,
-      maxWidth: maxWidth,
-      aspectRatio:
-          (story['coverAspectRatio'] as num?)?.toDouble() ??
-          (main
-              ? 1
-              : branded
-              ? 2
-              : 632 / 456),
-      onTap: () async {
-        await Navigator.of(context).push(
-          archiveRoute(
-            context,
-            (_) => StoryReviewPage(
-              storyId: id,
-              titleImageId: title,
-              storyDate: story['startTime']?.toString(),
-              storyType: story['type']?.toString(),
-            ),
-          ),
-        );
-        if (mounted) widget.onStoryClosed?.call();
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        StoryEntry(
+          key: ValueKey(id),
+          framed: main,
+          name: story['name'] as String? ?? id,
+          kvImage: coverUrl == null ? null : reviewAssets.image(coverUrl),
+          titleImage: titleUrl == null ? null : reviewAssets.image(titleUrl),
+          height: height,
+          maxWidth: maxWidth,
+          aspectRatio:
+              (story['coverAspectRatio'] as num?)?.toDouble() ??
+              (main
+                  ? 1
+                  : branded
+                  ? 2
+                  : 632 / 456),
+          onTap: () async {
+            await Navigator.of(context).push(
+              archiveRoute(
+                context,
+                (_) => StoryReviewPage(
+                  storyId: id,
+                  titleImageId: title,
+                  storyDate: story['startTime']?.toString(),
+                  storyType: story['type']?.toString(),
+                ),
+              ),
+            );
+            if (mounted) widget.onStoryClosed?.call();
+          },
+        ),
+        const SizedBox(height: 8),
+        StoryReadingProgress(storyId: id),
+      ],
     );
   }
 

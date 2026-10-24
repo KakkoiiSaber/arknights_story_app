@@ -8,6 +8,7 @@ import '../utils/audio_manager.dart';
 import '../story/story_playlist.dart';
 import '../settings/reader_settings_panel.dart';
 import '../components/review_download_panel.dart';
+import 'account_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -57,6 +58,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     archiveRoute(
                       context,
                       (_) => PrtsStoryView(
+                        storyId: task.id.split(':').last,
                         scriptURL: task.scripts[i],
                         playlist: [
                           for (final url in task.scripts)
@@ -85,6 +87,7 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context, _) => ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         children: [
+          const AccountPanel(),
           const ReaderSettingsPanel(),
           const ReviewDownloadPanel(),
           const Text('故事下载', style: TextStyle(fontSize: 21)),

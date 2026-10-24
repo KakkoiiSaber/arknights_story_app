@@ -13,12 +13,13 @@ dependencies:
   just_audio: ^0.10.5
   just_audio_windows: ^0.2.2
   audio_session: ^0.2.2
+  supabase_flutter: 2.18.3
   http: ^1.2.0
   visibility_detector: ^0.4.0
   web: ^1.1.1
   flutter_inappwebview: 6.1.5
   path_provider: 2.1.5
-  crypto: 3.0.6
+  crypto: 3.0.7
   archive: 4.0.7
 
 

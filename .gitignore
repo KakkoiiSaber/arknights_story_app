@@ -39,6 +39,9 @@ web/prts-player/
 player_host/public/
 lib/assets/prts_player.zip
 .cache/
+supabase/.temp/
+supabase/.branches/
+config/account.local.json
 lib/assets/review_bundle/*
 !lib/assets/review_bundle/.gitkeep
 !lib/assets/review_bundle/files/

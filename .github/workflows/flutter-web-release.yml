@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+env:
+  SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+  SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+
 jobs:
   build-web-docs:
     runs-on: ubuntu-latest
@@ -28,6 +32,7 @@ jobs:
         run: |
           npm ci
           npm run test:player
+          npm run test:accounts-schema
           npm run check:player
           npm run build:player
 
@@ -43,7 +48,7 @@ jobs:
       - name: Build Flutter Web
         run: |
           dart run tool/package_player.dart
-          flutter build web --release --base-href /arknights_story_app/
+          flutter build web --release --base-href /arknights_story_app/ --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
           npm run stage:player
 
       - name: Update docs folder

@@ -5,6 +5,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../downloads/native_service.dart';
 import 'native_player_host.dart';
 import '../settings/reader_settings.dart';
+import '../account/reading_session.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 
@@ -15,10 +16,12 @@ class PrtsStoryView extends StatefulWidget {
     required this.scriptURL,
     required this.title,
     this.playlist = const [],
+    this.storyId = '',
   });
   final String scriptURL;
   final String title;
   final List<StoryPlaylistEntry> playlist;
+  final String storyId;
   @override
   State<PrtsStoryView> createState() => _PrtsStoryViewState();
 }
@@ -28,9 +31,17 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
   String? _loadError;
   InAppWebViewController? _controller;
   late final AppLifecycleListener _lifecycle;
+  late final ReadingSession _session;
+
   @override
   void initState() {
     super.initState();
+    _session = ReadingSession(
+      widget.scriptURL,
+      widget.title,
+      widget.storyId,
+      widget.playlist,
+    );
     _host = _prepareHost();
     _lifecycle = AppLifecycleListener(
       onResume: () async {
@@ -84,6 +95,7 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
 
   @override
   void dispose() {
+    _session.close();
     _lifecycle.dispose();
     readerSettings.removeListener(_syncPreferences);
     _controller = null;
@@ -163,7 +175,15 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
                   if (currentURL?.origin != host.base.origin || args.isEmpty) {
                     return null;
                   }
-                  if (args.first == 'exit') {
+                  if (args.first == 'checkpoint' &&
+                      args.length > 1 &&
+                      args[1] is String) {
+                    return _session.checkpoint(args[1] as String);
+                  } else if (args.first == 'progress' &&
+                      args.length > 1 &&
+                      args[1] is Map) {
+                    _session.progress(args[1] as Map);
+                  } else if (args.first == 'exit') {
                     Navigator.of(context).maybePop();
                   } else if (args.first == 'preferences' &&
                       args.length > 1 &&

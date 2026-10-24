@@ -12,6 +12,7 @@ class StoryChapterEntry extends StatelessWidget {
     this.tag,
     this.last = false,
     this.compact = false,
+    this.progressLabel,
   });
 
   final String name;
@@ -21,6 +22,7 @@ class StoryChapterEntry extends StatelessWidget {
   final VoidCallback? onTap;
   final bool last;
   final bool compact;
+  final String? progressLabel;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -77,6 +79,16 @@ class StoryChapterEntry extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(width: 14),
+                  if (progressLabel != null) ...[
+                    Text(
+                      progressLabel!,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: ArchiveStyle.accent,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
                   Icon(
                     Icons.north_east,
                     size: 18,
