@@ -12,6 +12,8 @@ permissions:
 env:
   BUILD_NUMBER: ${{ github.run_number }}
   FLUTTER_VERSION: "3.47.5"
+  SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+  SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
 
 jobs:
   prepare:
@@ -20,6 +22,12 @@ jobs:
       build_name: ${{ steps.version.outputs.build_name }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Test account schema
+        run: npm ci && npm run test:accounts-schema
       - name: Test release tooling
         run: python3 -m unittest discover -s scripts/tests -v
       - name: Resolve app version
@@ -40,7 +48,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - uses: ./.github/actions/package-player
-      - run: flutter build apk --release --split-per-abi --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build apk --release --split-per-abi --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Package Android
         run: |
@@ -79,7 +87,7 @@ jobs:
             gstreamer1.0-plugins-base gstreamer1.0-tools gstreamer1.0-x
           flutter pub get
       - uses: ./.github/actions/package-player
-      - run: flutter build linux --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build linux --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Package Linux
         run: |
@@ -108,7 +116,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - uses: ./.github/actions/package-player
-      - run: flutter build macos --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build macos --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Package macOS
         run: |
@@ -140,7 +148,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - uses: ./.github/actions/package-player
-      - run: flutter build ios --release --no-codesign --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build ios --release --no-codesign --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Package iOS
         run: |
@@ -188,7 +196,7 @@ jobs:
       - uses: NuGet/setup-nuget@v2
       - uses: ./.github/actions/package-player
       - shell: bash
-        run: flutter build windows --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+        run: flutter build windows --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Package Windows
         shell: pwsh

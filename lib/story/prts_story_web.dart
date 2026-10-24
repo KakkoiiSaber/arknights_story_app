@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:web/web.dart' as web;
 import '../settings/reader_settings.dart';
+import '../account/reading_session.dart';
 
 class PrtsStoryView extends StatefulWidget {
   const PrtsStoryView({
@@ -13,10 +14,12 @@ class PrtsStoryView extends StatefulWidget {
     required this.scriptURL,
     required this.title,
     this.playlist = const [],
+    this.storyId = '',
   });
   final String scriptURL;
   final String title;
   final List<StoryPlaylistEntry> playlist;
+  final String storyId;
   @override
   State<PrtsStoryView> createState() => _PrtsStoryViewState();
 }
@@ -27,9 +30,17 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
   late final web.HTMLIFrameElement _frame;
   late final JSFunction _onMessage;
 
+  late final ReadingSession _session;
+
   @override
   void initState() {
     super.initState();
+    _session = ReadingSession(
+      widget.scriptURL,
+      widget.title,
+      widget.storyId,
+      widget.playlist,
+    );
     _viewType = 'prts-story-${_nextView++}';
     final url = Uri.parse(web.document.baseURI)
         .resolve('prts-player/index.html')
@@ -65,6 +76,22 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
         } else {
           try {
             final decoded = jsonDecode(data);
+            if (decoded is Map &&
+                decoded['type'] == 'arkstory:checkpoint-request' &&
+                decoded['chapterId'] is String) {
+              _frame.contentWindow?.postMessage(
+                jsonEncode({
+                  'type': 'arkstory:checkpoint',
+                  'requestId': decoded['requestId'],
+                  'value': _session.checkpoint(decoded['chapterId'] as String),
+                }).toJS,
+                web.window.location.origin.toJS,
+              );
+            } else if (decoded is Map &&
+                decoded['type'] == 'arkstory:progress' &&
+                decoded['value'] is Map) {
+              _session.progress(decoded['value'] as Map);
+            }
             if (decoded is Map &&
                 decoded['type'] == 'arkstory:save-preferences' &&
                 decoded['value'] is Map) {
@@ -102,6 +129,7 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
 
   @override
   void dispose() {
+    _session.close();
     readerSettings.removeListener(_syncPreferences);
     web.window.removeEventListener('message', _onMessage);
     // Navigate away to release upstream WebGL/audio even on Flutter's back route.

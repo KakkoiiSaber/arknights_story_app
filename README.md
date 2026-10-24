@@ -159,3 +159,27 @@ Web iframe 与原生 WebView 均启用 `skin=archive`，共用 `player_host/` �
 D 稿字体随 App 打包：`lib/assets/fonts/` 内含 Noto Sans SC（可变字重）与 Barlow Condensed，目录中的 OFL 文本保留字体授权。首页字号、标题基线、分组标识及封面反馈以 `design_drafts/industrial/fusion.css`、`fusion-review.css` 为参照。
 
 本地 Web 预览使用 `python tool/serve_preview.py`（端口 8766）。该开发服务器只在预览入口清理此来源下 Flutter 的离线缓存，避免反复构建后仍显示旧 UI；不会改动生产构建文件。构建后仍需运行 `npm run stage:player`。
+
+### 账户与跨设备阅读存档
+
+账户功能使用 Supabase Auth 邮箱密码登录。未登录时仍可离线阅读和保存游客存档；登录后可以选择合并游客的已读记录，并选择使用本机或云端阅读设置。博士名字、字体比例和文字间隔逐项同步。下载文件及下载任务只属于本机，不上传到云端。账号切换时，设置与阅读记录隔离保存。
+
+首次配置：
+
+1. 为 ArkStory 创建独立的 Supabase 项目。在目标项目执行 `supabase/migrations/` 的迁移。三个表启用 RLS，仅允许用户读写自己的记录；`sync_reading_records` 使用版本校验阻止旧设备覆盖新位置。
+2. Auth 中启用邮箱密码登录、邮箱确认，并配置正式 SMTP。将 **Confirm signup** 与 **Reset password** 的邮件模板加入 `{{ .Token }}`，例如 `<p>ArkStory 验证码：{{ .Token }}</p>`。App 内直接输入邮件验证码进行注册确认或密码重置，跨平台流程无需依赖外部 App 回调。设置合适的密码强度、邮件频率和验证码有效期。
+3. 复制 `config/account.example.json` 为被 Git 忽略的 `config/account.local.json`，填入项目 URL 和 **publishable key**。客户端不能使用 `service_role` 或 secret key。
+4. 本地运行 `flutter run -d windows --dart-define-from-file=config/account.local.json`。网页预览构建也需传入同一参数。没有配置时，账户入口会说明服务未配置，游客阅读仍然正常。
+5. GitHub Actions 的 Repository **Variables** 配置 `SUPABASE_URL` 和 `SUPABASE_PUBLISHABLE_KEY`。原生和 Web 发布工作流会将它们传给 Flutter 构建。这些是客户端公开配置，不是数据库密码。
+
+记录按剧情路径识别，与 GitHub Raw / PRTS 地址解耦。播放器通过受来源和播放列表校验的桥接上报实际对白、选择分支和完成状态。进入未完成章节可选择恢复或从头阅读；恢复过程不算新的阅读进度。剧本 SHA-256 不匹配时从头开始并保留完成记录。重读不清除已完成状态，主动跳过单独标记。
+
+本地每段对白保存；有待同步修改时每 15 秒批量推送，完成章节、进入后台会尝试推送。启动、登录、回到前台及手动同步会拉取云端记录。冲突时保留云端最近位置，合并已完成和最远已读信息；设置以云端已接受的版本为准，未冲突的字段正常上传。云端不可用不阻止阅读，设置页显示重试状态。故事目录和云端存档携带的小节总数用于首页展示完成度。
+
+已在游戏内读过剧情的用户可以补录：章节右侧菜单支持「标记已读 / 标记未读」，故事页「管理阅读状态」支持整部标记，设置中的「阅读记录管理」支持搜索、批量选择故事。整部及批量操作会二次确认；批量操作先准备全部目录，加载失败时不修改记录。手动状态与实际对白位置、分支、最远阅读进度分开保存，不创建或改写「继续阅读」；标记过的故事与章节完成度会更新并同步。手动状态携带操作时间，冲突时采用较新的显式标记，旧设备的历史完成事实不会重新覆盖较新的未读选择；再次实际读完该节会更新为已读。未登录时保存到游客记录，之后可合并到账户。
+
+验证：`flutter test`、`npm run test:player`、`npm run test:accounts-schema`。最后一项使用 PGlite 实际执行迁移，验证版本冲突、匿名访问限制、跨账号隔离和禁止变更记录所有者。正式接入项目后还需验证注册邮件、登录、密码重置、双设备同步和真实 RLS 行为。
+
+当前云端项目为 ArkStory’s Org / ArkStory App（`nskoppsjoqdlyszjfagf`）。已配置本机忽略的 `config/account.local.json` 与 GitHub Actions 的上述两个 Variables。2026-10-24 已通过 Dashboard SQL Editor 在空项目上执行 `20261024044953_reading_accounts.sql`；这不会登记 CLI 迁移历史，后续接入 CLI 时须先核对现有结构并修复迁移历史，不能直接重复执行建表迁移。`supabase/tests/reading_accounts.sql` 已在真实项目中通过：版本递增、旧设备冲突、两个账号间 RLS 隔离和匿名 RPC 限制；测试事务最终回滚，不保留用户或存档。
+
+已配置 Gmail 自定义 SMTP（`smtp.gmail.com:465`），凭据仅保存在 Supabase。Confirm sign up 与 Reset password 已应用 `supabase/templates/confirm-sign-up.html` 和 `reset-password.html`，邮件主题分别为「ArkStory · 注册验证码」和「ArkStory · 重置密码验证码」，刷新 Dashboard 后已确认保存。2026-10-24 经用户授权发送一次真实邮箱 OTP 测试，Auth API 返回 HTTP 200，Dashboard 出现待验证账号；随后已确认真实收信，用户已对 Web 与 Windows 的登录及基础阅读同步进行试用并反馈可用；离线恢复、重启与双端并发冲突仍需进一步实机回归。不要将 SMTP 密码写入客户端或仓库。

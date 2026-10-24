@@ -9,6 +9,8 @@ import 'downloads/download_service.dart';
 import 'settings/reader_settings.dart';
 import 'downloads/review_service.dart';
 import 'pages/startup_page.dart';
+import 'account/account_service.dart';
+import 'account/reading_library.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +30,8 @@ void main() {
 Future<void> initializeApp(ValueChanged<String> status) async {
   status('正在读取阅读设置');
   await readerSettings.init().timeout(const Duration(seconds: 10));
+  await readingLibrary.init();
+  accountService.init();
   status('正在检查本地资源');
   await reviewAssets.init().timeout(const Duration(seconds: 20));
   status('正在准备故事主题');

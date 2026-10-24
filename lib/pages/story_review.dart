@@ -12,6 +12,10 @@ import 'story.dart';
 import '../story/story_playlist.dart';
 import '../components/chapter_download_button.dart';
 import '../story/story_script.dart' show storyTxtPath;
+import '../account/reading_library.dart';
+import '../account/account_service.dart';
+import 'reading_history_page.dart' show reviewChapterTitles;
+import '../components/reading_progress.dart';
 
 class StoryReviewPage extends StatefulWidget {
   final String storyId;
@@ -19,6 +23,7 @@ class StoryReviewPage extends StatefulWidget {
   final String? storyDate;
   final String? storyType;
   final Duration fadeDuration;
+  final bool resumeOnOpen;
   const StoryReviewPage({
     super.key,
     required this.storyId,
@@ -26,6 +31,7 @@ class StoryReviewPage extends StatefulWidget {
     this.storyDate,
     this.storyType,
     this.fadeDuration = const Duration(milliseconds: 1000),
+    this.resumeOnOpen = false,
   });
 
   @override
@@ -47,6 +53,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   bool _needsRefresh = false;
   Future<void>? _loadingStory;
   ImageProvider? _titleProvider;
+  bool _autoResumed = false;
   StoryThemeAssets? get _theme =>
       StoryThemes.forStory(widget.storyId, metadata: _story);
 
@@ -63,6 +70,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     _music = audio.claimMusic();
     _reviewRevision = reviewAssets.revision;
     reviewAssets.addListener(_reviewUpdated);
+    readingLibrary.addListener(_readingUpdated);
     _loadStory();
   }
 
@@ -84,10 +92,12 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       archiveRoute(
         context,
         (_) => StoryPage(
+          storyId: widget.storyId,
           storyTxtPath: storyTxt,
           playlist: StoryPlaylistEntry.fromReview(
             infoUnlockDatas,
             archiveName: name ?? '',
+            storyId: widget.storyId,
           ),
           storyName: storyName,
           storyCode: storyCode,
@@ -115,6 +125,81 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       _needsRefresh = false;
       _loadStory();
     }
+  }
+
+  void _readingUpdated() {
+    if (mounted) setState(() {});
+  }
+
+  void _markChapters(Map<String, String> chapters, bool read) {
+    readingLibrary.markChapters(
+      widget.storyId,
+      chapters,
+      read,
+      chapterCount: infoUnlockDatas
+          .whereType<Map>()
+          .map((c) => c['storyTxt'])
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .length,
+    );
+    accountService.sync();
+  }
+
+  Future<void> _markStory(bool read) async {
+    final scope = readingLibrary.scope;
+    final chapters = reviewChapterTitles({'infoUnlockDatas': infoUnlockDatas});
+    if (chapters.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(read ? '整部标记已读？' : '整部标记未读？'),
+        content: Text('将更新 ${chapters.length} 节剧情的阅读状态，保留实际阅读位置与分支选择。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted && scope == readingLibrary.scope) {
+      _markChapters(chapters, read);
+    }
+  }
+
+  void _continueStory() {
+    final chapters = infoUnlockDatas
+        .whereType<Map>()
+        .where((c) => c['storyTxt'] is String)
+        .toList();
+    if (chapters.isEmpty) return;
+    final saved = readingLibrary.resume(widget.storyId)?['chapterId'];
+    var index = chapters.indexWhere(
+      (c) => chapterKey(c['storyTxt'] as String) == saved,
+    );
+    if (index < 0) index = 0;
+    final checkpoint = readingLibrary.chapter(
+      chapters[index]['storyTxt'] as String,
+    );
+    if ((checkpoint?['atEnd'] == true ||
+            (checkpoint?['atEnd'] == null &&
+                checkpoint?['completed'] == true)) &&
+        index + 1 < chapters.length) {
+      index++;
+    }
+    final c = chapters[index];
+    _openStory(
+      storyTxt: c['storyTxt'] as String,
+      storyName: c['storyName'] as String?,
+      storyCode: c['storyCode'] as String?,
+      storyTag: c['avgTag'] as String?,
+    );
   }
 
   Future<void> _loadStory() =>
@@ -160,6 +245,19 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         });
       }
 
+      readingLibrary.registerStory(
+        widget.storyId,
+        infoUnlockDatas
+            .whereType<Map>()
+            .map((c) => c['storyTxt'])
+            .whereType<String>(),
+      );
+      if (widget.resumeOnOpen && !_autoResumed && mounted) {
+        _autoResumed = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _continueStory();
+        });
+      }
       // Artwork and audio prepare independently; the chapter list is usable immediately.
       await Future.wait([
         _preloadBackground(backgroundUrls),
@@ -272,6 +370,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
   @override
   void dispose() {
+    readingLibrary.removeListener(_readingUpdated);
     reviewAssets.removeListener(_reviewUpdated);
     // The pop future can resume home before this exit animation disposes us.
     // Closing this scope must never stop the new homepage music.
@@ -401,6 +500,39 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         ],
       ),
       const SizedBox(height: 18),
+      StoryReadingProgress(storyId: widget.storyId),
+      if (infoUnlockDatas.isNotEmpty)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: PopupMenuButton<bool>(
+            tooltip: '管理故事阅读状态',
+            onSelected: _markStory,
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: true, child: Text('整部标记已读')),
+              PopupMenuItem(value: false, child: Text('整部标记未读')),
+            ],
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.fact_check_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('管理阅读状态'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      if (readingLibrary.resume(widget.storyId) != null)
+        TextButton.icon(
+          onPressed: _continueStory,
+          icon: const Icon(Icons.play_arrow, size: 18),
+          label: Text(
+            '继续阅读 · ${readingLibrary.resume(widget.storyId)?['title'] ?? ''}',
+          ),
+        ),
+      const SizedBox(height: 12),
       if (infoUnlockDatas.isNotEmpty)
         ChapterDownloadButton(
           storyId: 'story:${Database.storyContentPath}:${widget.storyId}',
@@ -446,6 +578,17 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       tag: data['avgTag'] as String?,
       compact: compact,
       last: last,
+      progressLabel: txt == null ? null : chapterProgressLabel(txt),
+      isRead: txt != null && chapterIsRead(readingLibrary.chapter(txt)),
+      onMarkRead: txt == null || txt.isEmpty
+          ? null
+          : (read) => _markChapters({
+              txt: [
+                data['storyCode'],
+                data['storyName'],
+                data['avgTag'],
+              ].whereType<String>().join(' · '),
+            }, read),
       onTap: txt == null || txt.isEmpty
           ? null
           : () => _openStory(

@@ -54,6 +54,10 @@ class ReaderSettings extends ChangeNotifier {
       if (scale != null) 'fontScale': scale,
       if (interval != null) 'typingIntervalMs': interval,
     });
+    await persist();
+  }
+
+  Future<void> persist() async {
     final encoded = jsonEncode(toJson());
     _saving = _saving.then((_) async {
       try {

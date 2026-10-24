@@ -10,18 +10,39 @@ class StoryPlayerView extends StatefulWidget {
     required this.player,
     required this.title,
     this.artBuilder,
+    this.onPositionChanged,
+    this.onChoice,
+    this.onRestart,
   });
   final StoryPlayer player;
   final String title;
   final Widget Function(List<String> urls, BoxFit fit)? artBuilder;
+  final VoidCallback? onPositionChanged;
+  final void Function(int line, int option)? onChoice;
+  final VoidCallback? onRestart;
   @override
   State<StoryPlayerView> createState() => _StoryPlayerViewState();
 }
 
 class _StoryPlayerViewState extends State<StoryPlayerView> {
   StoryPlayer get player => widget.player;
-  void _advance() => setState(player.advance);
-  void _restart() => setState(player.restart);
+  void _advance() {
+    setState(player.advance);
+    widget.onPositionChanged?.call();
+  }
+
+  void _restart() {
+    widget.onRestart?.call();
+    setState(player.restart);
+    widget.onPositionChanged?.call();
+  }
+
+  void _choose(int index) {
+    widget.onChoice?.call(player.lineNumber, index);
+    setState(() => player.choose(index));
+    widget.onPositionChanged?.call();
+  }
+
   Widget _art(List<String> urls, BoxFit fit) =>
       widget.artBuilder?.call(urls, fit) ??
       _StoryArt(key: ValueKey(urls.join('|')), urls: urls, fit: fit);
@@ -210,8 +231,7 @@ class _StoryPlayerViewState extends State<StoryPlayerView> {
                                         width: double.infinity,
                                         child: OutlinedButton(
                                           key: ValueKey('choice-$i'),
-                                          onPressed: () =>
-                                              setState(() => player.choose(i)),
+                                          onPressed: () => _choose(i),
                                           child: Text(
                                             player.choices[i].label,
                                             style: const TextStyle(

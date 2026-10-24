@@ -15,17 +15,20 @@ class StoryPage extends StatelessWidget {
     this.storyCode,
     this.storyTag,
     this.playlist = const [],
+    this.storyId = '',
   });
   final String storyTxtPath;
   final String? storyName;
   final String? storyCode;
   final String? storyTag;
   final List<StoryPlaylistEntry> playlist;
+  final String storyId;
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xff090d12),
     body: !kIsWeb && defaultTargetPlatform == TargetPlatform.linux
         ? BasicStoryReader(
+            storyId: storyId,
             scriptURL:
                 '${Database.storyContentPath}${script.storyTxtPath(storyTxtPath)}',
             title: [
@@ -35,6 +38,7 @@ class StoryPage extends StatelessWidget {
             ].whereType<String>().where((part) => part.isNotEmpty).join(' · '),
           )
         : PrtsStoryView(
+            storyId: storyId,
             playlist: playlist,
             scriptURL:
                 '${Database.storyContentPath}${script.storyTxtPath(storyTxtPath)}',

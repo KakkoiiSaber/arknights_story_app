@@ -7,23 +7,27 @@ class StoryPlaylistEntry {
     required this.title,
     this.summary = '',
     this.storyName = '',
+    this.storyId = '',
   });
   final String scriptURL;
   final String title;
   final String summary;
   final String storyName;
+  final String storyId;
 
   Map<String, String> toJson() => {
     'script': scriptURL,
     'title': title,
     if (summary.isNotEmpty) 'summary': summary,
     if (storyName.isNotEmpty) 'storyName': storyName,
+    if (storyId.isNotEmpty) 'storyId': storyId,
   };
 
   /// Preserve the review's reading order, including before/after battle pairs.
   static List<StoryPlaylistEntry> fromReview(
     List<dynamic> sections, {
     String archiveName = '',
+    String storyId = '',
   }) => [
     for (final section in sections)
       if (section is Map &&
@@ -32,6 +36,7 @@ class StoryPlaylistEntry {
         StoryPlaylistEntry(
           summary: section['storyDesc'] as String? ?? '',
           storyName: archiveName,
+          storyId: storyId,
           scriptURL:
               '${Database.storyContentPath}${storyTxtPath(section['storyTxt'] as String)}',
           title: [
