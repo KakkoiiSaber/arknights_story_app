@@ -83,57 +83,60 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('设置')),
-    body: ListenableBuilder(
-      listenable: downloadService,
-      builder: (context, _) => ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        children: [
-          const AccountPanel(),
-          ListTile(
-            leading: const Icon(Icons.fact_check_outlined),
-            title: const Text('阅读记录管理'),
-            subtitle: const Text('批量补录已读故事'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(
-              context,
-            ).push(archiveRoute(context, (_) => const ReadingHistoryPage())),
-          ),
-          const ReaderSettingsPanel(),
-          const ReviewDownloadPanel(),
-          const Text('故事下载', style: TextStyle(fontSize: 21)),
-          const SizedBox(height: 12),
-          if (!downloadService.supported)
-            const Text(
-              'Web 版使用在线阅读。章节下载仅在 Windows、macOS、iOS 和 Android App 提供。',
-              style: TextStyle(color: ArchiveStyle.muted),
-            )
-          else ...[
-            Text(
-              '本地占用 ${downloadSize(downloadService.storedBytes)} · ${downloadService.tasks.length} 个故事',
-              style: const TextStyle(color: ArchiveStyle.muted),
+    body: SafeArea(
+      top: false, // The AppBar already consumes the top system inset.
+      child: ListenableBuilder(
+        listenable: downloadService,
+        builder: (context, _) => ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          children: [
+            const AccountPanel(),
+            ListTile(
+              leading: const Icon(Icons.fact_check_outlined),
+              title: const Text('阅读记录管理'),
+              subtitle: const Text('批量补录已读故事'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(
+                context,
+              ).push(archiveRoute(context, (_) => const ReadingHistoryPage())),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              '暂停后保留已完成文件，继续时重新下载未完成文件；关闭 App 后任务暂停。共享资源只保存一份。',
-              style: TextStyle(color: ArchiveStyle.muted, fontSize: 12),
-            ),
-            if (downloadService.error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  downloadService.error!,
-                  style: const TextStyle(color: Colors.orangeAccent),
+            const ReaderSettingsPanel(),
+            const ReviewDownloadPanel(),
+            const Text('故事下载', style: TextStyle(fontSize: 21)),
+            const SizedBox(height: 12),
+            if (!downloadService.supported)
+              const Text(
+                'Web 版使用在线阅读。章节下载仅在 Windows、macOS、iOS 和 Android App 提供。',
+                style: TextStyle(color: ArchiveStyle.muted),
+              )
+            else ...[
+              Text(
+                '本地占用 ${downloadSize(downloadService.storedBytes)} · ${downloadService.tasks.length} 个故事',
+                style: const TextStyle(color: ArchiveStyle.muted),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '暂停后保留已完成文件，继续时重新下载未完成文件；关闭 App 后任务暂停。共享资源只保存一份。',
+                style: TextStyle(color: ArchiveStyle.muted, fontSize: 12),
+              ),
+              if (downloadService.error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    downloadService.error!,
+                    style: const TextStyle(color: Colors.orangeAccent),
+                  ),
                 ),
-              ),
-            const SizedBox(height: 20),
-            if (downloadService.tasks.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Text('暂无下载。可在故事介绍页下载整个故事。'),
-              ),
-            for (final task in downloadService.tasks) _task(task),
+              const SizedBox(height: 20),
+              if (downloadService.tasks.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Text('暂无下载。可在故事介绍页下载整个故事。'),
+                ),
+              for (final task in downloadService.tasks) _task(task),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   );

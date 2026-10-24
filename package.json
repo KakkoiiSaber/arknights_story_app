@@ -6,7 +6,7 @@
     "build:player": "node player_host/prepare.mjs && vite build --config player_host/vite.config.mjs",
     "check:player": "tsc --noEmit -p player_host/tsconfig.json",
     "stage:player": "node player_host/stage.mjs",
-    "test:player": "node --test player_host/source.test.mjs player_host/loading-window.test.mjs player_host/preferences-adapter.test.mjs player_host/reader-controls.test.mjs player_host/story-queue.test.mjs player_host/audio-lifecycle.test.mjs player_host/reading-progress.test.mjs player_host/reading-runtime.test.mjs",
+    "test:player": "node --test player_host/source.test.mjs player_host/loading-window.test.mjs player_host/preferences-adapter.test.mjs player_host/reader-controls.test.mjs player_host/story-queue.test.mjs player_host/audio-lifecycle.test.mjs player_host/reading-progress.test.mjs player_host/reading-runtime.test.mjs player_host/playback-controls.test.mjs",
     "test:accounts-schema": "node scripts/test_account_schema.mjs"
   },
   "dependencies": {

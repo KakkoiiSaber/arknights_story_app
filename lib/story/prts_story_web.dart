@@ -139,6 +139,5 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      SafeArea(child: HtmlElementView(viewType: _viewType));
+  Widget build(BuildContext context) => HtmlElementView(viewType: _viewType);
 }

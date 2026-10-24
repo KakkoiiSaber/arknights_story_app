@@ -105,7 +105,8 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.black,
-    body: SafeArea(
+    // Paint the scene behind system insets; the HTML HUD owns safe areas.
+    body: SizedBox.expand(
       child: FutureBuilder<NativePlayerHost>(
         future: _host,
         builder: (context, snapshot) {

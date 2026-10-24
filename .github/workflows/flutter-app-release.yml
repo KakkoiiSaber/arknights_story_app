@@ -148,6 +148,8 @@ jobs:
           cache: true
       - run: flutter pub get
       - uses: ./.github/actions/package-player
+      - name: Test reader settings and native player
+        run: flutter test test/settings_safe_area_test.dart test/reader_settings_test.dart test/story_playlist_test.dart test/native_player_host_test.dart
       - run: flutter build ios --release --no-codesign --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Package iOS

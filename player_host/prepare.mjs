@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 const upstream = new URL('third_party/prts-widgets/', root);
+const hostRevision = execFileSync('git', ['rev-parse', 'HEAD'], {
+  cwd: fileURLToPath(root), encoding: 'utf8',
+}).trim();
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: fileURLToPath(upstream), encoding: 'utf8',
 }).trim();
@@ -87,6 +90,6 @@ for (const file of filenames) {
 await copyFile(new URL('LICENSE', upstream), new URL('UPSTREAM-LICENSE.txt', publicDir));
 await writeFile(new URL('upstream.json', publicDir), JSON.stringify({
   repository: 'https://github.com/MooncellWiki/prts-widgets', revision,
-  fonts: filenames, hostProtocol: 1,
+  fonts: filenames, hostProtocol: 1, hostRevision,
 }, null, 2));
 console.log(`PRTS ${revision.slice(0, 7)}: ${filenames.length} fonts ready`);

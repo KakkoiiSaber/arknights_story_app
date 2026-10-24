@@ -9,9 +9,15 @@ export function adaptReaderPreferences(source, id) {
   if (path.endsWith('/StoryPlayer/engine/textVariables.ts'))
     return replace('export function getStoryNickname(): string {',
       'export function getStoryNickname(): string {\n  if (globalThis.__arkstoryPreferences) return globalThis.__arkstoryPreferences.doctorName;');
-  if (path.endsWith('/StoryPlayer/engine/runtime.ts'))
+  if (path.endsWith('/StoryPlayer/engine/runtime.ts')) {
+    // Normal automatic reading uses the reader's text speed and normal waits.
+    // Only quick play consults a speed gear table.
+    const automaticGear = source.match(/    if \(this\.autoPlayMode === "button_auto"\)\s+return \(\s+BUTTON_AUTO_SPEEDS\[this\.buttonSpeedLevel\] \?\? BUTTON_AUTO_SPEEDS\[0\]!\s+\);/)?.[0];
+    if (!automaticGear) throw new Error(`PRTS automatic reading contract changed: ${path}`);
+    source = replace(automaticGear, '');
     return replace('return this.defaultSpeed;',
       'return { ...this.defaultSpeed, typeWriterDelayMs: globalThis.__arkstoryPreferences?.typingIntervalMs ?? this.defaultSpeed.typeWriterDelayMs };');
+  }
   if (path.endsWith('/rendering/panels/DialogPanel.ts')) {
     source = replace('    this.applyLayout(layout);', `    globalThis.__arkstoryRefreshDialogue = () => {
       if (!this.dialogue) return;

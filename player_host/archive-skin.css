@@ -14,6 +14,8 @@ html[data-skin="archive"] #auto::after{content:'AUTO'}
 html[data-skin="archive"] #quick::after{content:'FFWD'}
 html[data-skin="archive"] #art-view::after{content:'VIEW'}
 html[data-skin="archive"] #art-view svg{width:22px;height:22px;flex-shrink:0}
+html[data-skin="archive"] #hud #art-view{transition:none;-webkit-tap-highlight-color:transparent}
+html[data-skin="archive"] #hud #art-view:hover{background:#182022aa;color:inherit}
 html[data-skin="archive"] #skip::after{content:'SKIP'}
 html[data-skin="archive"] #settings::after{content:'SETUP'}
 html[data-skin="archive"] #restart::after{content:'RESET'}
@@ -71,3 +73,8 @@ html[data-skin="archive"] .log-dialogue{position:relative;white-space:pre-wrap;c
 html[data-skin="archive"] .log-current .log-dialogue::before{content:'';position:absolute;left:-24px;top:.45em;width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:11px solid #d5cd50}
 @media(max-width:620px){html[data-skin="archive"] #log-content{padding:80px 24px 65px}html[data-skin="archive"] .log-entry{grid-template-columns:80px minmax(0,1fr);gap:18px;padding:8px 0}html[data-skin="archive"] .log-current .log-dialogue::before{left:-17px;border-left-width:8px}}
 @media(max-height:500px){html[data-skin="archive"] #log-content{padding-top:65px;padding-bottom:50px}html[data-skin="archive"] .log-entry{padding:7px 0}}
+
+/* Keep history controls/text safe while its backdrop covers the full scene. */
+html[data-skin="archive"] #log-panel .panel-heading{top:calc(12px + var(--reader-safe-top));left:var(--reader-safe-left);right:var(--reader-safe-right)}
+html[data-skin="archive"] #log-content{padding-left:max(clamp(24px,7vw,110px),calc(24px + var(--reader-safe-left)));padding-right:max(clamp(24px,7vw,110px),calc(24px + var(--reader-safe-right)));padding-top:calc(100px + var(--reader-safe-top));padding-bottom:calc(90px + var(--reader-safe-bottom))}
+@media(max-height:500px){html[data-skin="archive"] #log-content{padding-top:calc(65px + var(--reader-safe-top));padding-bottom:calc(50px + var(--reader-safe-bottom))}}

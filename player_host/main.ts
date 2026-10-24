@@ -115,6 +115,9 @@ async function load(continuing = false, allowRestore = true) {
     queue ??= new StoryQueue(query.get('script'), query.get('playlist'));
     const scriptURL = queue.current.script;
     document.title = queue.current.title || query.get('title') || '剧情阅读';
+    const chapterTitle = element<HTMLElement>('chapter-title');
+    chapterTitle.textContent = queue.current.title || query.get('title') || '';
+    chapterTitle.title = chapterTitle.textContent;
     stage.dataset.script = scriptURL;
     let response: Response;
     try { response = await fetch(scriptURL, { signal: AbortSignal.timeout(30000) }); }
@@ -174,7 +177,7 @@ async function load(continuing = false, allowRestore = true) {
     controls.attach(player, lines, context.audioVariables);
     if (playback) {
       player.setAutoPlayMode(playback.mode);
-      player.setAutoPlaySpeedLevel(playback.mode === 'quick_play' ? playback.quickSpeedLevel : playback.buttonSpeedLevel);
+      if (playback.mode === 'quick_play') player.setAutoPlaySpeedLevel(playback.quickSpeedLevel);
     }
     ready = true;
     const loadMs = Math.round(performance.now() - started);
