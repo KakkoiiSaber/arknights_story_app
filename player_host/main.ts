@@ -119,7 +119,7 @@ async function load(continuing = false, allowRestore = true) {
   setLoadingProgress(0);
   retry.hidden = true;
   try {
-    queue ??= new StoryQueue(query.get('script'), query.get('playlist'));
+    queue ??= new StoryQueue(query.get('script'), new URLSearchParams(location.hash.slice(1)).get('playlist') ?? query.get('playlist'));
     const scriptURL = queue.current.script;
     document.title = queue.current.title || query.get('title') || '剧情阅读';
     const chapterTitle = element<HTMLElement>('chapter-title');

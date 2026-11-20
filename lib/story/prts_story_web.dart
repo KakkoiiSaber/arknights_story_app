@@ -50,13 +50,15 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
             'title': widget.title,
             'skin': 'archive',
             'preferences': jsonEncode(readerSettings.toJson()),
-            'playlist': jsonEncode(
-              widget.playlist.map((entry) => entry.toJson()).toList(),
-            ),
           },
         );
+    // A full story can exceed the hosting server's request-URL limit.
+    // The browser keeps the encoded playlist fragment local to the iframe.
+    final playlist = jsonEncode(
+      widget.playlist.map((entry) => entry.toJson()).toList(),
+    );
     _frame = web.HTMLIFrameElement()
-      ..src = url.toString()
+      ..src = '$url#playlist=${Uri.encodeQueryComponent(playlist)}'
       ..title = 'PRTS 剧情播放器'
       ..setAttribute('allow', 'autoplay')
       ..style.border = '0'
