@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -29,10 +29,44 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>arknights_story_app</title>
+  <title>方舟档案馆</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html, body { margin: 0; background: #141718; color: #e4e8e7; }
+    #startup { position: fixed; inset: 0; z-index: 1; display: grid; place-content: center;
+      text-align: center; background: #141718; font: 16px/1.6 system-ui, sans-serif; }
+    #startup strong { font-size: 24px; letter-spacing: .12em; }
+    #startup p { color: #b1bcbe; }
+    #startup button { justify-self: center; padding: .45em 1.3em; border: 1px solid #697477;
+      background: transparent; color: inherit; font: inherit; cursor: pointer; }
+  </style>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <div id="startup" role="status">
+    <strong>方舟档案馆</strong>
+    <p id="startup-status">正在加载阅读界面…</p>
+    <button type="button" hidden onclick="location.reload()">重新加载</button>
+    <noscript>请启用 JavaScript 后重新打开。</noscript>
+  </div>
+  <script>
+    const startup = document.getElementById('startup');
+    function showRetry(message) {
+      startup.querySelector('p').textContent = message;
+      startup.querySelector('button').hidden = false;
+    }
+    const startupTimer = setTimeout(() => showRetry('加载时间较长，可以继续等待或重试。'), 20000);
+    window.addEventListener('flutter-first-frame', () => {
+      clearTimeout(startupTimer);
+      startup.remove();
+    }, { once: true });
+    window.addEventListener('error', event => {
+      if (event.target instanceof HTMLScriptElement && startup.isConnected) {
+        clearTimeout(startupTimer);
+        showRetry('启动文件加载失败，请检查网络后重试。');
+      }
+    }, true);
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
