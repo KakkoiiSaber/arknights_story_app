@@ -29,7 +29,6 @@ export function setArtView(value: boolean, animate = false) {
   const hudFrom = getComputedStyle(hud).opacity;
   hud.getAnimations().forEach(animation => animation.cancel());
   document.body.classList.toggle('art-view', value);
-  document.getElementById('art-view')?.setAttribute('aria-pressed', String(value));
   const finish = () => {
     if (root && !root.destroyed) { root.alpha = value ? 0 : 1; root.renderable = !value; }
     restore.hidden = !value;

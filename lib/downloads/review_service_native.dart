@@ -58,7 +58,6 @@ class ReviewAssetService extends ChangeNotifier {
 
   Future<void> _ready() async {
     await init();
-    if (_cache?.revision == null) await checkForUpdates();
   }
 
   Future<dynamic> json(String url) async {
@@ -82,6 +81,11 @@ class ReviewAssetService extends ChangeNotifier {
 
   Future<void> start(String scope) async {
     await _ready();
+    if (_cache?.resources.containsKey(Database.storyMetaTablePath) != true) {
+      await checkForUpdates();
+      if (_cache?.resources.containsKey(Database.storyMetaTablePath) != true)
+        return;
+    }
     await _cache?.start(scope);
   }
 

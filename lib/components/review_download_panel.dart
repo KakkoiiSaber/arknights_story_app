@@ -96,7 +96,7 @@ class ReviewDownloadPanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              '首次下载目录与封面，背景和音乐按需保存。每次启动检查数据更新，只下载变更文件；关闭 App 后批量任务暂停。',
+              '首页和故事页按需加载，不自动批量下载。可在这里检查更新，选择下载首页素材或全部主题资源；关闭 App 后批量任务暂停。',
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
             const SizedBox(height: 12),
@@ -147,13 +147,13 @@ class ReviewDownloadPanel extends StatelessWidget {
                   )
                 else ...[
                   TextButton(
-                    onPressed: service.revision == null || service.clearing
+                    onPressed: service.checking || service.clearing
                         ? null
                         : () => service.start('home'),
                     child: const Text('下载首页素材'),
                   ),
                   TextButton(
-                    onPressed: service.revision == null || service.clearing
+                    onPressed: service.checking || service.clearing
                         ? null
                         : () => service.start('all'),
                     child: Text(

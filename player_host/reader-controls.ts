@@ -56,9 +56,8 @@ export class ReaderControls {
     el('quick').onclick = () => this.toggleMode('quick_play');
     el('speed').onclick = () => {
       const state = this.player?.getAutoPlayState();
-      if (!state) return;
-      const quick = state.mode === 'quick_play';
-      this.player?.setAutoPlaySpeedLevel(((quick ? state.quickSpeedLevel : state.buttonSpeedLevel) + 1) % (quick ? 4 : 3));
+      if (!state || state.mode !== 'quick_play') return;
+      this.player?.setAutoPlaySpeedLevel((state.quickSpeedLevel + 1) % 4);
       this.sync();
     };
     el('log').onclick = () => this.openLog();
@@ -114,8 +113,8 @@ export class ReaderControls {
     el<HTMLButtonElement>('skip').disabled = finished || this.skipping;
     el<HTMLButtonElement>('log').disabled = !player;
     const speed = el<HTMLButtonElement>('speed');
-    speed.hidden = finished || !mode || mode.mode === 'default';
-    if (mode) speed.textContent = `${(mode.mode === 'quick_play' ? mode.quickSpeedLevel : mode.buttonSpeedLevel) + 1} 档`;
+    speed.hidden = finished || mode?.mode !== 'quick_play';
+    if (mode) speed.textContent = `${mode.quickSpeedLevel + 1} 档`;
   }
 
   private openLog() {

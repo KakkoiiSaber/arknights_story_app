@@ -65,7 +65,7 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
       Future<void> worker() async {
         while (next < ids.length) {
           final id = ids[next++];
-          final data = await _load('${Database.reviewInfoPath}$id.json');
+          final data = await _load(Database.detailURL(id));
           final chapters = reviewChapterTitles(data);
           if (chapters.isEmpty) throw StateError('部分故事目录加载失败，请重试；本次尚未修改记录。');
           prepared[id] = chapters;

@@ -15,12 +15,18 @@ import type { StoryPlayer } from '../third_party/prts-widgets/src/widgets/StoryP
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stage = element<HTMLDivElement>('stage');
+// Suppress the browser's long-press menu outside editable settings fields.
+document.addEventListener('contextmenu', event => {
+  if (!(event.target instanceof Element && event.target.closest('input, textarea'))) {
+    event.preventDefault();
+  }
+});
 const overlay = element<HTMLDivElement>('overlay');
+const hud = element<HTMLElement>('hud');
 const heading = element<HTMLHeadingElement>('heading');
 const status = element<HTMLParagraphElement>('status');
 const progress = element<HTMLProgressElement>('progress');
 const retry = element<HTMLButtonElement>('retry');
-const restart = element<HTMLButtonElement>('restart');
 const query = new URLSearchParams(location.search);
 const archiveSkin = query.get('skin') === 'archive';
 const loadingPercent = element<HTMLOutputElement>('loading-percent');
@@ -79,6 +85,7 @@ Object.assign(globalThis, { __arkstoryResumeAudio: unlockAudio });
 function fail(error: unknown) {
   console.error('[PRTS host]', error);
   ready = false;
+  hud.hidden = false;
   overlay.hidden = false;
   overlay.dataset.phase = 'error';
   heading.textContent = '剧情加载失败';
@@ -101,6 +108,7 @@ async function load(continuing = false, allowRestore = true) {
   const current = ++generation;
   ready = false;
   controls.attach(null);
+  hud.hidden = true;
   player?.destroy();
   player = null;
   overlay.hidden = false;
@@ -110,11 +118,13 @@ async function load(continuing = false, allowRestore = true) {
   progress.hidden = false;
   setLoadingProgress(0);
   retry.hidden = true;
-  restart.disabled = true;
   try {
     queue ??= new StoryQueue(query.get('script'), query.get('playlist'));
     const scriptURL = queue.current.script;
     document.title = queue.current.title || query.get('title') || '剧情阅读';
+    const chapterTitle = element<HTMLElement>('chapter-title');
+    chapterTitle.textContent = queue.current.title || query.get('title') || '';
+    chapterTitle.title = chapterTitle.textContent;
     stage.dataset.script = scriptURL;
     let response: Response;
     try { response = await fetch(scriptURL, { signal: AbortSignal.timeout(30000) }); }
@@ -174,13 +184,12 @@ async function load(continuing = false, allowRestore = true) {
     controls.attach(player, lines, context.audioVariables);
     if (playback) {
       player.setAutoPlayMode(playback.mode);
-      player.setAutoPlaySpeedLevel(playback.mode === 'quick_play' ? playback.quickSpeedLevel : playback.buttonSpeedLevel);
+      if (playback.mode === 'quick_play') player.setAutoPlaySpeedLevel(playback.quickSpeedLevel);
     }
     ready = true;
     const loadMs = Math.round(performance.now() - started);
     stage.dataset.loadMs = String(loadMs);
     setLoadingProgress(1);
-    restart.disabled = false;
     let pendingLine: number | null = null;
     let warming = false;
     const warmAhead = async () => {
@@ -247,7 +256,7 @@ async function load(continuing = false, allowRestore = true) {
         if (update.phase !== 'reached') { failedRestore(); return; }
         releaseRestoreAudio();
         restoring = false; active.setAutoPlayMode('default');
-        overlay.hidden = true;
+        overlay.hidden = true; hud.hidden = false;
         saveProgress();
       });
       unlockAudio();
@@ -261,6 +270,7 @@ async function begin() {
   const active = player;
   unlockAudio();
   overlay.hidden = true;
+  hud.hidden = false;
   stage.focus();
   await active.start();
 }
@@ -276,7 +286,6 @@ stage.addEventListener('keydown', event => {
     advance();
   }
 });
-restart.onclick = () => { void load(); };
 async function skipStory() {
   if (!ready || !player || disposed || controls.modalOpen || !overlay.hidden) return;
   try {

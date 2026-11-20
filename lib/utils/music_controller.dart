@@ -138,6 +138,7 @@ class MusicController {
   Future<void> _fade(_Track track, double target) async {
     final generation = ++track.fadeGeneration;
     final start = track.gain;
+    if (start == target) return;
     final steps = fadeDuration.inMilliseconds == 0 ? 1 : 20;
     for (var step = 1; step <= steps; step++) {
       if (steps > 1) await Future<void>.delayed(fadeDuration ~/ steps);

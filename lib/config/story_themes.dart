@@ -39,6 +39,11 @@ class StoryThemeAssets {
 class StoryThemes {
   static Map<String, StoryThemeAssets> _themes = const {};
 
+  static bool isBrandedCover(String id, String key) {
+    final theme = _themes[id];
+    return theme?.coverUrl == key && theme?.coverContainsTitle == true;
+  }
+
   static Future<void> load() async {
     final json =
         jsonDecode(
@@ -55,6 +60,7 @@ class StoryThemes {
 
   // These wordmarks are Chinese; other locales retain their existing data.
   static StoryThemeAssets? forStory(String id, {Map? metadata}) {
+    if (metadata?['arkstoryData'] == true) return null;
     if (Config.server != 'zh_CN') return null;
     // The data repository's complement is authoritative once published. The
     // bundled copy keeps previews working before the data branch is published.

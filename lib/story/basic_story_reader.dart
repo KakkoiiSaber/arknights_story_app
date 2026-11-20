@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/data_retriever.dart';
+import '../config/database.dart';
 import 'story_player.dart';
 import 'story_player_view.dart';
 import 'story_script.dart';
@@ -25,6 +26,7 @@ class BasicStoryReader extends StatefulWidget {
 class _BasicStoryReaderState extends State<BasicStoryReader> {
   late Future<StoryPlayer> _future;
   late final String _scope;
+  static Map? _portraits;
   String _hash = '';
   int _total = 0;
   final _choices = <Map<String, int>>[];
@@ -36,7 +38,10 @@ class _BasicStoryReaderState extends State<BasicStoryReader> {
   }
 
   Future<StoryPlayer> _load() async {
-    final text = await DataRetriever.getTextFromURL(widget.scriptURL);
+    final script = DataRetriever.getTextFromURL(widget.scriptURL);
+    _portraits ??=
+        await DataRetriever.getJsonFromURL(Database.characterIndexURL) as Map?;
+    final text = await script;
     if (text == null) throw StateError('无法加载剧情，请检查网络后重试');
     _hash = sha256
         .convert(utf8.encode(text.replaceAll(RegExp(r'\r\n?'), '\n')))
@@ -118,6 +123,7 @@ class _BasicStoryReaderState extends State<BasicStoryReader> {
       if (snapshot.hasData) {
         return StoryPlayerView(
           player: snapshot.data!,
+          portraits: _portraits ?? const {},
           title: widget.title,
           onPositionChanged: () => _save(snapshot.data!),
           onRestart: _choices.clear,

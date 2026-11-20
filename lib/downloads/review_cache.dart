@@ -1,3 +1,4 @@
+import '../config/config.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -155,6 +156,93 @@ class ReviewCache extends ChangeNotifier {
 
   Future<void> checkForUpdates() =>
       _updating ??= _refresh().whenComplete(() => _updating = null);
+  // Build the offline snapshot only on an explicit settings download/update.
+  Future<Map> _archiveManifest(List<int> bytes, Map media) async {
+    final records = <String, Map>{};
+    final root = manifestURL.resolve('../');
+    for (final record in (media['resources'] as Map).values) {
+      final path = record['path'] as String;
+      final url = root.resolve(path).toString();
+      final name = path.split('/').last;
+      records[url] = {
+        ...record,
+        'extension': name.substring(name.lastIndexOf('.')),
+        'sources': [url],
+        'stories': [],
+        'roles': [
+          name.startsWith('cover.')
+              ? 'cover'
+              : name.startsWith('title.')
+              ? 'logo'
+              : path.startsWith('media/home/')
+              ? 'cover'
+              : 'theme',
+        ],
+      };
+    }
+    Future<Map> saveJson(Uri uri, List<int> body) async {
+      final doc = jsonDecode(utf8.decode(body)) as Map;
+      final hash = sha256.convert(body).toString();
+      final resource = {
+        'sha256': hash,
+        'bytes': body.length,
+        'extension': '.json',
+        'sources': [uri.toString()],
+        'roles': ['metadata'],
+        'stories': [],
+      };
+      final file = fileFor(ReviewResource(uri.toString(), resource));
+      if (!await file.exists()) await _write(file, utf8.decode(body));
+      records[uri.toString()] = resource;
+      return doc;
+    }
+
+    Future<Map> fetchJson(Uri uri) async {
+      final request = await _client
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 15));
+      final response = await request.close().timeout(
+        const Duration(seconds: 25),
+      );
+      if (response.statusCode != 200) {
+        await response.drain<void>();
+        throw HttpException('目录 HTTP ${response.statusCode}', uri: uri);
+      }
+      final body = await response
+          .fold<List<int>>([], (list, chunk) => list..addAll(chunk))
+          .timeout(const Duration(seconds: 30));
+      return saveJson(uri, body);
+    }
+
+    await saveJson(manifestURL, bytes);
+    final indexUri = manifestURL.resolve('${Config.server}/index.json');
+    final index = await fetchJson(indexUri);
+    final paths = (index['stories'] as List)
+        .map((item) => indexUri.resolve(item['detail'] as String))
+        .toList();
+    var next = 0;
+    Future<void> worker() async {
+      while (next < paths.length) {
+        await fetchJson(paths[next++]);
+      }
+    }
+
+    await Future.wait(List.generate(4, (_) => worker()));
+    final sorted = records.keys.toList()..sort();
+    final revision = sha256.convert(
+      utf8.encode(
+        jsonEncode([
+          for (final key in sorted) [key, records[key]!['sha256']],
+        ]),
+      ),
+    );
+    return {
+      'version': 1,
+      'revision': revision.toString(),
+      'resources': records,
+    };
+  }
+
   Future<void> _refresh() async {
     checking = true;
     updateError = null;
@@ -178,7 +266,10 @@ class ReviewCache extends ChangeNotifier {
             return all..addAll(chunk);
           })
           .timeout(const Duration(seconds: 25));
-      final data = jsonDecode(utf8.decode(bytes)) as Map;
+      final document = jsonDecode(utf8.decode(bytes)) as Map;
+      final data = document.containsKey('bundles')
+          ? await _archiveManifest(bytes, document)
+          : document;
       final incoming = _parse(data);
       if (data['revision'] != revision) {
         // Stage the new catalog first; a failed update leaves the prior
@@ -195,18 +286,13 @@ class ReviewCache extends ChangeNotifier {
         );
         final resume = running ? selection : null;
         await pause();
-        await _write(_manifestFile, utf8.decode(bytes));
+        await _write(_manifestFile, jsonEncode(data));
         _install(data);
         _verified.clear();
         await _scan();
         notifyListeners();
-        // Refill just changed/new homepage resources. A running full download
-        // keeps its scope; paused tasks stay paused across data updates.
-        if (resume != null || state != 'paused') {
-          unawaited(start(resume ?? 'home'));
-        }
-      } else if (state == 'idle') {
-        unawaited(start('home'));
+        // Only continue a batch the user already started in Settings.
+        if (resume != null) unawaited(start(resume));
       }
     } catch (e) {
       updateError = '检查资源更新失败：$e';

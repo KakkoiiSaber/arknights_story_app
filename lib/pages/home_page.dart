@@ -8,7 +8,6 @@ import '../utils/music_controller.dart';
 import '../utils/data_retriever.dart';
 import 'settings_page.dart';
 import '../downloads/review_service.dart';
-import '../components/review_download_panel.dart';
 import '../account/account_service.dart';
 import '../account/reading_library.dart';
 import 'account_page.dart';
@@ -337,7 +336,6 @@ class _HomePageState extends State<HomePage>
                   ],
                 ),
               ),
-              ReviewDownloadPanel(compact: true, onRetry: _retryCatalog),
               ListenableBuilder(
                 listenable: readingLibrary,
                 builder: (context, _) {

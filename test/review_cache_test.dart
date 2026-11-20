@@ -64,7 +64,7 @@ void main() {
       final path = request.uri.path;
       hits[path] = (hits[path] ?? 0) + 1;
       try {
-        if (path == '/manifest') {
+        if (path == '/manifest' || path == '/data/media.json') {
           request.response.write(jsonEncode(manifest));
         } else if (failMetadata && path == '/meta2') {
           request.response.statusCode = 503;
@@ -103,6 +103,48 @@ void main() {
   });
 
   test(
+    'arkstory_data snapshots preserve relative detail paths and verify media',
+    () async {
+      await cache.close();
+      cache = ReviewCache(root, Uri.parse('$base/data/media.json'));
+      await cache.init();
+      const index = '/data/zh_CN/index.json';
+      const detail = '/data/zh_CN/stories/demo.json';
+      const art = '/media/demo/cover.png';
+      bodies[index] = utf8.encode(
+        '{"stories":[{"detail":"stories/demo.json"}]}',
+      );
+      bodies[detail] = utf8.encode('{"kvImageId":"old-key"}');
+      bodies[art] = [1, 2, 3];
+      manifest = {
+        'version': 1,
+        'bundles': {},
+        'resources': {
+          'old-key': {
+            'path': art.substring(1),
+            'sha256': sha256.convert(bodies[art]!).toString(),
+            'bytes': 3,
+          },
+        },
+      };
+      await cache.checkForUpdates();
+      expect(cache.updateError, isNull);
+      expect(hits[art], isNull);
+      expect(
+        await (await cache.ensure('$base$detail')).readAsBytes(),
+        bodies[detail],
+      );
+      await cache.start('home');
+      await settled();
+      expect(
+        await (await cache.ensure('$base$art')).readAsBytes(),
+        bodies[art],
+      );
+      expect(hits[art], 1);
+    },
+  );
+
+  test(
     'first catalog download reports bytes before catalog is installed',
     () async {
       slowMetadata = true;
@@ -127,14 +169,17 @@ void main() {
   );
 
   test(
-    'first launch saves the catalog and covers, and loads theme media only on demand',
+    'checking updates does not start a media batch; downloads require selection',
     () async {
       await cache.checkForUpdates();
       await settled();
       expect(cache.revision, 'version-one');
       expect(hits['/meta'], 1);
-      expect(hits['/cover'], 1);
+      expect(hits['/cover'], isNull);
       expect(hits['/background'], isNull);
+      expect(cache.running, isFalse);
+      await cache.start('home');
+      expect(hits['/cover'], 1);
       await Future.wait([cache.ensure(background), cache.ensure(background)]);
       expect(hits['/background'], 1);
       expect(
@@ -149,6 +194,7 @@ void main() {
     () async {
       await cache.checkForUpdates();
       await settled();
+      await cache.start('home');
       await cache.checkForUpdates();
       await settled();
       expect(hits['/cover'], 1);
@@ -160,6 +206,8 @@ void main() {
       expect(cache.revision, 'version-two');
       expect(hits['/meta'], 1);
       expect(hits['/cover'], 1);
+      expect(hits['/new-cover'], isNull);
+      await cache.start('home');
       expect(hits['/new-cover'], 1);
       expect(hits['/background'], isNull);
     },
@@ -263,6 +311,7 @@ void main() {
     () async {
       await cache.checkForUpdates();
       await settled();
+      await cache.start('home');
       final original = cache.fileFor(cache.resources[cover]!);
       await cache.close();
       final orphan = File(

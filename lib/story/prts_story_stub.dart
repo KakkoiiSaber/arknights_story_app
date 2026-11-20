@@ -105,7 +105,7 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.black,
-    body: SafeArea(
+    body: SizedBox.expand(
       child: FutureBuilder<NativePlayerHost>(
         future: _host,
         builder: (context, snapshot) {
@@ -158,6 +158,7 @@ class _PrtsStoryViewState extends State<PrtsStoryView> {
               ),
             ),
             initialSettings: InAppWebViewSettings(
+              disableContextMenu: true,
               javaScriptEnabled: true,
               mediaPlaybackRequiresUserGesture: false,
               allowsInlineMediaPlayback: true,

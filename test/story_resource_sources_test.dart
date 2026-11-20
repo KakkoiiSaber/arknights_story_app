@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:arknights_story_app/downloads/story_resource_sources.dart';
 
 void main() {
-  test('equivalent arkdata routes precede the unchanged PRTS identity', () {
+  test('runtime media use PRTS directly', () {
     const paths = {
       'avg/background/bg_cher_1.png': 'avg/backgrounds/bg_cher_1.png',
       'avg/images/cgitem_76_i16_3.png': 'avg/images/cgitem_76_i16_3.png',
@@ -13,12 +13,7 @@ void main() {
       final original = Uri.parse(
         'https://torappu.prts.wiki/assets/${entry.key}',
       );
-      expect(storyResourceSources(original), [
-        Uri.parse(
-          'https://raw.githubusercontent.com/akgcc/arkdata/main/assets/torappu/dynamicassets/${entry.value}',
-        ),
-        original,
-      ]);
+      expect(storyResourceSources(original), [original]);
     }
   });
   test(

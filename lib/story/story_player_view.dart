@@ -10,10 +10,12 @@ class StoryPlayerView extends StatefulWidget {
     required this.player,
     required this.title,
     this.artBuilder,
+    this.portraits = const {},
     this.onPositionChanged,
     this.onChoice,
     this.onRestart,
   });
+  final Map portraits;
   final StoryPlayer player;
   final String title;
   final Widget Function(List<String> urls, BoxFit fit)? artBuilder;
@@ -48,11 +50,32 @@ class _StoryPlayerViewState extends State<StoryPlayerView> {
       _StoryArt(key: ValueKey(urls.join('|')), urls: urls, fit: fit);
 
   Widget _character(String slot, StoryCharacter character, double stageHeight) {
-    List<String> urls;
-    try {
-      urls = Database.storyCharacterURLs(character.name);
-    } on ArgumentError {
-      urls = [];
+    final sprite = Database.portrait(character.name, widget.portraits);
+    Widget image = _art([
+      if (sprite != null) sprite['image'] as String,
+    ], BoxFit.contain);
+    if (sprite?['face'] is String) {
+      final rect = sprite!['rect'], size = sprite['size'];
+      image = FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: (size['x'] as num).toDouble(),
+          height: (size['y'] as num).toDouble(),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              image,
+              Positioned(
+                left: (rect['x'] as num).toDouble(),
+                top: (rect['y'] as num).toDouble(),
+                width: (rect['w'] as num).toDouble(),
+                height: (rect['h'] as num).toDouble(),
+                child: _art([sprite['face'] as String], BoxFit.fill),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     return FractionallySizedBox(
       key: ValueKey('character-$slot'),
@@ -66,10 +89,7 @@ class _StoryPlayerViewState extends State<StoryPlayerView> {
         child: SizedBox(
           width: stageHeight * .95,
           height: stageHeight * .95,
-          child: Opacity(
-            opacity: character.dimmed ? .48 : 1,
-            child: _art(urls, BoxFit.contain),
-          ),
+          child: Opacity(opacity: character.dimmed ? .48 : 1, child: image),
         ),
       ),
     );

@@ -5,13 +5,12 @@ import '../components/story_chapter_entry.dart';
 import '../config/story_themes.dart';
 import '../downloads/review_service.dart';
 import '../components/story_background.dart';
+import '../components/story_title_artwork.dart';
 import '../utils/audio_manager.dart';
 import '../utils/music_controller.dart';
 import '../utils/data_retriever.dart';
 import 'story.dart';
 import '../story/story_playlist.dart';
-import '../components/chapter_download_button.dart';
-import '../story/story_script.dart' show storyTxtPath;
 import '../account/reading_library.dart';
 import '../account/account_service.dart';
 import 'reading_history_page.dart' show reviewChapterTitles;
@@ -53,6 +52,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
   bool _needsRefresh = false;
   Future<void>? _loadingStory;
   ImageProvider? _titleProvider;
+  bool _titleLoading = false;
   bool _autoResumed = false;
   StoryThemeAssets? get _theme =>
       StoryThemes.forStory(widget.storyId, metadata: _story);
@@ -202,6 +202,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     );
   }
 
+  List<String>? _storyBackgrounds(Map story) => story['backgroundUrls'] is List
+      ? List<String>.from(story['backgroundUrls'])
+      : null;
+
   Future<void> _loadStory() =>
       _loadingStory ??= _loadStoryContent().whenComplete(() {
         _loadingStory = null;
@@ -213,7 +217,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
 
   Future<void> _loadStoryContent() async {
     if (!mounted) return;
-    final url = '${Database.reviewInfoPath}${widget.storyId}.json';
+    final url = Database.detailURL(widget.storyId);
     try {
       final fetched = await DataRetriever.getJsonFromURL(url);
       if (fetched is! Map) throw Exception('Invalid story data');
@@ -221,8 +225,9 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       final theme = StoryThemes.forStory(widget.storyId, metadata: story);
       final bgId = story['backgroundId']?.toString();
       final musicKey = story['gameMusicName']?.toString();
-      final titleId = widget.titleImageId ?? story['titleImageId']?.toString();
+      final titleId = story['titleImageId']?.toString() ?? widget.titleImageId;
       final backgroundUrls =
+          (_storyBackgrounds(story)) ??
           theme?.backgroundUrls ??
           [
             if (bgId != null && bgId.isNotEmpty)
@@ -242,6 +247,7 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
           _backgroundUrls = backgroundUrls;
           _bgProviders = const [];
           _titleProvider = null;
+          _titleLoading = titleUrl != null && titleUrl.isNotEmpty;
         });
       }
 
@@ -308,7 +314,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
     final provider = reviewAssets.image(url);
     final loaded = await _precache(provider);
     if (!mounted) return;
-    setState(() => _titleProvider = loaded ? provider : null);
+    setState(() {
+      _titleProvider = loaded ? provider : null;
+      _titleLoading = false;
+    });
   }
 
   Future<void> _playBgMusic(String? musicKey) async {
@@ -319,6 +328,14 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         _story?['musicRole'] == 'none' ||
         musicKey?.startsWith('story.') == true) {
       await music.play();
+      return;
+    }
+    if (_story?['arkstoryData'] == true) {
+      final track = _story?['audio'] as Map?;
+      await music.play(
+        intro: track?['intro'] as String?,
+        loop: track?['loop'] as String?,
+      );
       return;
     }
     final theme = _theme;
@@ -386,7 +403,10 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         : widget.fadeDuration,
     child: StoryBackground(
       images: _bgProviders,
-      aspectRatio: _theme?.backgroundAspectRatio ?? 16 / 9,
+      aspectRatio:
+          (_story?['backgroundAspectRatio'] as num?)?.toDouble() ??
+          _theme?.backgroundAspectRatio ??
+          16 / 9,
     ),
   );
 
@@ -458,21 +478,12 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
         Align(alignment: Alignment.centerRight, child: _recordLabel()),
         SizedBox(height: compact ? 14 : 24),
       ],
-      if (_titleProvider != null)
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 340, maxHeight: 180),
-            child: Image(
-              image: _titleProvider!,
-              width: 280,
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
-              errorBuilder: (_, _, _) => _name(),
-            ),
-          ),
-        )
-      else
-        _name(),
+      StoryTitleArtwork(
+        name: name ?? '',
+        image: _titleProvider,
+        loading: _titleLoading,
+        compact: compact,
+      ),
       const SizedBox(height: 18),
       if (desc?.trim().isNotEmpty == true) ...[
         Text(
@@ -533,22 +544,6 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
           ),
         ),
       const SizedBox(height: 12),
-      if (infoUnlockDatas.isNotEmpty)
-        ChapterDownloadButton(
-          storyId: 'story:${Database.storyContentPath}:${widget.storyId}',
-          title: name ?? widget.storyId,
-          chapters: {
-            for (final raw in infoUnlockDatas)
-              if (raw is Map &&
-                  raw['storyTxt'] is String &&
-                  (raw['storyTxt'] as String).isNotEmpty)
-                '${Database.storyContentPath}${storyTxtPath(raw['storyTxt'] as String)}':
-                    [raw['storyCode'], raw['storyName'], raw['avgTag']]
-                        .whereType<String>()
-                        .where((part) => part.isNotEmpty)
-                        .join(' · '),
-          },
-        ),
       for (var i = 0; i < infoUnlockDatas.length; i++)
         _chapter(
           infoUnlockDatas[i] as Map,
@@ -558,15 +553,6 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
       if (infoUnlockDatas.isEmpty)
         const Text('暂无可阅读章节', style: TextStyle(color: ArchiveStyle.muted)),
     ],
-  );
-
-  Widget _name() => Text(
-    name ?? '',
-    style: const TextStyle(
-      color: ArchiveStyle.foreground,
-      fontSize: 27,
-      letterSpacing: 2,
-    ),
   );
 
   Widget _chapter(Map data, {required bool compact, required bool last}) {
@@ -758,14 +744,17 @@ class _StoryReviewPageState extends State<StoryReviewPage> {
                             color: ArchiveStyle.muted,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          (widget.storyDate ?? '').replaceAll('-', ' / '),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: ArchiveStyle.muted,
+                        if (widget.storyType != 'MAIN_STORY' &&
+                            (widget.storyDate ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            (widget.storyDate ?? '').replaceAll('-', ' / '),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: ArchiveStyle.muted,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

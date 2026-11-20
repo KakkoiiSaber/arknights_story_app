@@ -43,7 +43,6 @@ Future<void> initializeApp(ValueChanged<String> status) async {
   } catch (error) {
     debugPrint('Audio startup unavailable: $error');
   }
-  reviewAssets.checkForUpdates().catchError((Object _) {});
   downloadService.init().catchError((Object _) {});
 }
 
@@ -54,23 +53,6 @@ class ArknightsStoryApp extends StatefulWidget {
 }
 
 class _ArknightsStoryAppState extends State<ArknightsStoryApp> {
-  late final AppLifecycleListener _lifecycle;
-  @override
-  void initState() {
-    super.initState();
-    _lifecycle = AppLifecycleListener(
-      onResume: () {
-        reviewAssets.checkForUpdates().catchError((Object _) {});
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _lifecycle.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

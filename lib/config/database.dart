@@ -2,36 +2,26 @@ import 'config.dart';
 
 class Database {
   // path to story review meta data, review info
-  static String reviewDataURL =
-      "https://raw.githubusercontent.com/KakkoiiSaber/arknights_story_data/main";
+  static const _defaultRoot =
+      'https://raw.githubusercontent.com/KakkoiiSaber/arkstory_data/main/';
   static String get reviewManifestURL => const String.fromEnvironment(
     'STORY_REVIEW_MANIFEST_URL',
-    defaultValue:
-        'https://raw.githubusercontent.com/KakkoiiSaber/arknights_story_data/main/assets/review_manifest.json',
+    defaultValue: '${_defaultRoot}data/media.json',
   );
-
-  static String storyMetaTablePath =
-      "$reviewDataURL/assets/${Config.server}/story_meta_table.json";
-  static String gameMusicDataPath =
-      "$reviewDataURL/assets/${Config.server}/audio_data.json";
-  static String reviewInfoPath =
-      "$reviewDataURL/assets/${Config.server}/story_review_info/";
-
-  // path to story review assets
-  static const reviewAssetsURL =
-      "https://raw.githubusercontent.com/KakkoiiSaber/arkdata/main";
-  //story cover images
-  static const kvImagePath =
-      "$reviewAssetsURL/assets/torappu/dynamicassets/arts/ui/mixstory/kvs/";
-  // story title images
-  static const titleImagePath =
-      "$reviewAssetsURL/assets/torappu/dynamicassets/arts/ui/mixstory/titles/";
-  // story review background images
-  static const backgroundPath =
-      "$reviewAssetsURL/assets/torappu/dynamicassets/arts/ui/mixstory/retrobkgs/";
-  // story review music assets
-  static const gameMusicPath = "$reviewAssetsURL/assets/torappu/dynamicassets/";
-
+  static String get reviewDataURL =>
+      Uri.parse(reviewManifestURL).resolve('../').toString();
+  static String get storyMetaTablePath =>
+      '${reviewDataURL}data/${Config.server}/index.json';
+  static String get gameMusicDataPath => '$storyMetaTablePath#homeMusic';
+  static String get reviewInfoPath =>
+      '${reviewDataURL}data/${Config.server}/stories/';
+  static final detailPaths = <String, String>{};
+  static String detailURL(String id) =>
+      detailPaths['$storyMetaTablePath:$id'] ?? '$reviewInfoPath$id.json';
+  static String get kvImagePath => reviewDataURL;
+  static String get titleImagePath => reviewDataURL;
+  static String get backgroundPath => reviewDataURL;
+  static String get gameMusicPath => reviewDataURL;
   static String reviewAssetURL(String base, String value) =>
       Uri.parse(base).resolve(value).toString();
 
@@ -48,42 +38,51 @@ class Database {
       "$storyContentURL/${Config.server}/gamedata/story/";
 
   // path to story assets
-  static const storyAssetsURL =
-      "https://raw.githubusercontent.com/akgcc/arkdata/main";
-  static String storyBackgroundPath =
-      "$storyAssetsURL/assets/torappu/dynamicassets/avg/backgrounds";
-  static String storyImagePath =
-      "$storyAssetsURL/assets/torappu/dynamicassets/avg/images";
-  static String storyMusicPath =
-      "$storyAssetsURL/assets/torappu/dynamicassets/";
-  static String storySoundPath =
-      "$storyAssetsURL/assets/torappu/dynamicassets/";
+  static const storyAssetsURL = "https://torappu.prts.wiki";
+  static String storyBackgroundPath = "$storyAssetsURL/assets/avg/background";
+  static String storyImagePath = "$storyAssetsURL/assets/avg/images";
+  static String storyMusicPath = "$storyAssetsURL/assets/audio/";
+  static String storySoundPath = "$storyAssetsURL/assets/audio/";
   static String storyCharacterPath = "$storyAssetsURL/assets/avg/characters";
-  // Cropped story portraits, separate from operator roster avatars.
-  static const storyAvatarPath = "$storyAssetsURL/thumbs";
+  static const characterIndexURL = '$storyAssetsURL/assets/avg/character.json';
 
-  // Script names may omit the default face/pose: char_002_amiya_1#5
-  // corresponds to char_002_amiya_1#5$1 in the extracted assets.
-  static String _storyCharacterKey(String name) {
+  static String portraitURL(String key) =>
+      '$storyCharacterPath/${key.split('/').map(Uri.encodeComponent).join('/')}.png';
+
+  static Map? portrait(String name, Map catalog) {
     final match = RegExp(
       r'^([^#$]+)(?:#(\d+))?(?:\$(\d+))?$',
     ).firstMatch(name.trim().toLowerCase());
-    if (match == null) {
-      throw ArgumentError.value(name, 'name', 'Invalid AVG character key');
-    }
-    final face = int.parse(match.group(2) ?? '1');
-    final pose = int.parse(match.group(3) ?? '1');
-    return '${match.group(1)}#$face\$$pose';
+    if (match == null) return null;
+    final node = catalog[match[1]];
+    final entries = node?['array'];
+    if (entries is! List || entries.isEmpty) return null;
+    final index = int.parse(match[2] ?? '1') - 1;
+    final body = int.parse(match[3] ?? '1') - 1;
+    final entry = entries.cast<Map>().firstWhere(
+      (e) => e['body'] == body && e['index'] == index,
+      orElse: () => entries.first as Map,
+    );
+    if (entry['image'] is String) return {'image': portraitURL(entry['image'])};
+    final groupIndex = entry['group'];
+    final groups = node['groups'];
+    if (groups is! List ||
+        groupIndex is! int ||
+        groupIndex < 0 ||
+        groupIndex >= groups.length)
+      return null;
+    final group = groups[groupIndex];
+    if (group['base'] is! String ||
+        entry['face'] is! String ||
+        group['faceRect'] is! Map)
+      return null;
+    return {
+      'image': portraitURL(group['base']),
+      'face': portraitURL(entry['face']),
+      'rect': group['faceRect'],
+      'size': node['size'],
+    };
   }
-
-  // Encode the filename so '#' is sent to the server, not used as a fragment.
-  // PNG is the verified format for the sample sprites; asset fallbacks belong
-  // in the future resource resolver when handling other script characters.
-  static String storyCharacterURL(String name) =>
-      '$storyCharacterPath/${Uri.encodeComponent('${_storyCharacterKey(name)}.png')}';
-
-  static String storyAvatarURL(String name) =>
-      '$storyAvatarPath/${Uri.encodeComponent('${_storyCharacterKey(name)}.webp')}';
 
   static String storyBackgroundURL(String name) =>
       '$storyBackgroundPath/${_imageFilename(name)}';
@@ -96,24 +95,4 @@ class Database {
         ? name
         : '$name.png',
   );
-
-  // Prefer the exact expression/pose; shorter default variants occur in arkdata.
-  static List<String> storyCharacterURLs(String name) {
-    final canonical = _storyCharacterKey(name);
-    final match = RegExp(r'^(.*?)#(\d+)\$(\d+)$').firstMatch(canonical)!;
-    final id = match.group(1)!;
-    final face = match.group(2)!;
-    final pose = match.group(3)!;
-    final keys = [
-      canonical,
-      if (pose == '1') '$id#$face',
-      if (face == '1') '$id\$$pose',
-      if (face == '1' && pose == '1') id,
-    ];
-    return [
-      for (final key in keys)
-        for (final extension in ['png', 'webp'])
-          '$storyCharacterPath/${Uri.encodeComponent('$key.$extension')}',
-    ];
-  }
 }

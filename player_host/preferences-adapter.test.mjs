@@ -21,7 +21,7 @@ test('real upstream nickname substitution follows the global doctor name', async
   } finally { delete globalThis.__arkstoryPreferences; }
 });
 
-test('manual text speed changes preserve automatic animation and wait settings', async () => {
+test('automatic reading follows text preferences regardless of gears; quick play keeps its speed', async () => {
   const source = adaptReaderPreferences(await read('engine/runtime.ts'),
     '/StoryPlayer/engine/runtime.ts');
   const body = source.match(/private getCurrentSpeed\(\): AutoSpeed \{([\s\S]*?)\n  \}/)[1];
@@ -34,8 +34,19 @@ test('manual text speed changes preserve automatic animation and wait settings',
   globalThis.__arkstoryPreferences = {typingIntervalMs: 0};
   try {
     assert.deepEqual(speed.call(runtime, [], []), {...runtime.defaultSpeed, typeWriterDelayMs: 0});
-    runtime.autoPlayMode = 'button_auto'; runtime.buttonSpeedLevel = 0;
-    assert.deepEqual(speed.call(runtime, [{typeWriterDelayMs: 10}], []), {typeWriterDelayMs: 10});
+    runtime.autoPlayMode = 'button_auto';
+    for (const delay of [0, 25, 70]) {
+      globalThis.__arkstoryPreferences.typingIntervalMs = delay;
+      for (const gear of [0, 1, 2]) {
+        runtime.buttonSpeedLevel = gear;
+        runtime.quickSpeedLevel = gear;
+        assert.deepEqual(speed.call(runtime, [{typeWriterDelayMs: 10}], []),
+          {...runtime.defaultSpeed, typeWriterDelayMs: delay});
+      }
+    }
+    runtime.autoPlayMode = 'quick_play'; runtime.quickSpeedLevel = 1;
+    const quickSpeeds = [{typeWriterDelayMs: 10}, {typeWriterDelayMs: 5}];
+    assert.deepEqual(speed.call(runtime, [], quickSpeeds), quickSpeeds[1]);
   } finally { delete globalThis.__arkstoryPreferences; }
 });
 

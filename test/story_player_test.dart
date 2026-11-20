@@ -131,16 +131,23 @@ void main() {
     expect(player.text, '正文');
   });
 
-  test('asset URLs encode expression keys and include default variants', () {
-    final urls = Database.storyCharacterURLs('char_002_amiya_1#05');
-    expect(urls.first, endsWith('char_002_amiya_1%235%241.png'));
-    expect(urls.any((url) => url.endsWith('char_002_amiya_1%235.png')), isTrue);
-    expect(Uri.parse(urls.first).fragment, isEmpty);
-    expect(
-      Database.storyCharacterURLs('char_130_doberm_ex').last,
-      endsWith('char_130_doberm_ex.webp'),
-    );
-    expect(Database.storyBackgroundURL('bg_a.png'), endsWith('/bg_a.png'));
-    expect(Database.storyImageURL('cg_a'), endsWith('/cg_a.png'));
-  });
+  test(
+    'portrait paths use PRTS catalog slots and preserve nested path segments',
+    () {
+      final portrait = Database.portrait('char_a#05', {
+        'char_a': {
+          'array': [
+            {'body': 0, 'index': 0, 'image': 'A/default'},
+            {'body': 0, 'index': 4, 'image': 'A/face#5'},
+          ],
+        },
+      });
+      expect(
+        portrait?['image'],
+        'https://torappu.prts.wiki/assets/avg/characters/A/face%235.png',
+      );
+      expect(Database.storyBackgroundURL('bg_a.png'), endsWith('/bg_a.png'));
+      expect(Database.storyImageURL('cg_a'), endsWith('/cg_a.png'));
+    },
+  );
 }

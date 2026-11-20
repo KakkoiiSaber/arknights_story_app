@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:arknights_story_app/components/story_entry.dart';
+import 'package:arknights_story_app/components/story_title_artwork.dart';
 import 'package:arknights_story_app/components/story_chapter_entry.dart';
 import 'package:arknights_story_app/components/story_dashboard.dart';
 import 'package:arknights_story_app/config/archive_style.dart';
@@ -176,4 +177,41 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
+  testWidgets(
+    'logo loading reserves its final box and never moves the synopsis',
+    (tester) async {
+      final image = MemoryImage((await tester.runAsync(() => png(400, 100)))!);
+      Widget page({ImageProvider? logo, bool loading = false}) => MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 340,
+            child: Column(
+              children: [
+                StoryTitleArtwork(name: '故事名', image: logo, loading: loading),
+                const Text('故事简介'),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(page(loading: true));
+      final before = tester.getRect(find.text('故事简介'));
+      expect(find.text('故事名'), findsNothing);
+      expect(tester.getSize(find.byType(StoryTitleArtwork)).height, 180);
+      await tester.pumpWidget(page(logo: image));
+      await tester.runAsync(
+        () => precacheImage(
+          image,
+          tester.element(find.byType(StoryTitleArtwork)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.text('故事简介')), before);
+      expect(tester.getSize(find.byType(StoryTitleArtwork)).height, 180);
+      await tester.pumpWidget(page());
+      expect(find.text('故事名'), findsOneWidget);
+      expect(tester.getRect(find.text('故事简介')), before);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

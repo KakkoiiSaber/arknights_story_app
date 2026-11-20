@@ -110,19 +110,11 @@ Windows 构建需 NuGet CLI，运行需 Microsoft Edge WebView2 Runtime。增加
 
 ### 首页与主题资源按需下载
 
-安装包不携带资源清单、故事目录、封面、背景或主题音乐。原生端首次启动从 story data 的 `assets/review_manifest.json` 获取清单，下载并校验对应的目录/章节介绍快照，再下载首页封面和 Logo；背景、音乐在打开故事页时按需下载。Web 继续在线使用现有数据，不提供持久下载管理。
+首页读取 arkstory_data 的 `data/<locale>/index.json`，按卡片的 `detail` 路径加载故事详情。封面、标题图、背景、首页和详情页音乐均按 `data/media.json` 的资源键查找，使用记录的 `path` 从同一仓库加载。中文、英文、日文和韩文目录共享媒体库。
 
-每次启动先加载本地快照，再后台检查清单的内容版本。SHA-256 相同的文件复用，新增或变更的文件才下载；新版目录先完整落盘，失败时保留上一版。文件存储在应用支持目录 `review-resources/`，不是系统可自动清理的临时缓存。首屏优先使用可见素材，批量预取不阻塞进入故事。首页显示更新状态；设置中的「首页与主题资源」提供版本、占用、进度、检查更新、下载首页、补齐全部、暂停/继续和清理。清理保留故事目录及独立的 AVG 故事下载。
+原生端可在设置中检查更新、下载首页素材或全部主题资源。更新时先准备当前语言的目录与详情快照，按 SHA-256 校验媒体并复用已下载文件。Web 在线读取。章节 TXT 按目录提供的路径从游戏数据仓库读取，播放时的立绘、场景图和音视频由 PRTS 提供。
 
-清单由 **story data 仓库** 的 Update Data Action 运行 `node scripts/review_manifest.mjs --refresh` 生成并与数据一起提交，包含真实资源来源、分组、大小与校验值，以及内容寻址的 `assets/review_payload/files/*.json`。App 发布工作流不再抓取或打包主题素材，因此数据更新无需发布新版 App。默认中文目录；数据生成器的 `--locales` 可以扩展语言。塞壬唱片会过期的签名音源通过曲目 ID 获取新地址后，仍按预期 SHA-256 校验内容。
-
-默认清单地址为数据仓库 main 分支。开发测试可使用：
-
-```sh
-flutter run -d windows --dart-define=STORY_REVIEW_MANIFEST_URL=https://raw.githubusercontent.com/KakkoiiSaber/arknights_story_data/dev/assets/review_manifest.json
-```
-
-首次使用需要先发布数据仓库的新清单和 JSON 快照；发布前 App 会报告清单更新失败并保留现有在线读取回退。所有主题素材补齐约 419.7 MiB，首页仅预取目录、封面与 Logo。暂停和关闭 App 后均复用完整文件，未完成文件重新下载，避免 CDN 不支持 Range 时拼接损坏。
+开发时可通过 `--dart-define=STORY_REVIEW_MANIFEST_URL=...` 指向其他分支的 `data/media.json`，索引与媒体会使用同一分支。
 
 原生端烟雾测试可用 `flutter run -d windows -t tool/native_player_smoke.dart`：实际下载序章资源，检查本地命中且播放期间没有远程补载，结果写入 `.dart_tool/native-smoke-result.json`。Linux 继续保留基础 Flutter 阅读器，暂不提供 PRTS 原生下载。
 
@@ -133,13 +125,13 @@ PRTS 播放页的「设置」与首页设置共用全局阅读偏好：博士名
 背景通过 Flutter 图片缓存加载，章节列表不等待大图或音乐下载完成。
 
 review data and assets:
-[story review meta/audio/info data](https://github.com/KakkoiiSaber/arknights_story_data/tree/main/assets)
-[story review cover/title/bg/bgmusic assets](https://github.com/KakkoiiSaber/arkdata/tree/main/assets)
+[story review meta/audio/info data](https://github.com/KakkoiiSaber/arkstory_data/tree/main/data)
+[story review cover/title/bg/bgmusic assets](https://github.com/KakkoiiSaber/arkstory_data/tree/main/media)
 
 story data and assets:
 [story data cn](https://github.com/Kengxxiao/ArknightsGameData/tree/master/zh_CN/gamedata/story)
 [story data global](https://github.com/Kengxxiao/ArknightsGameData_YoStar/tree/main/en_US/gamedata/story)
-[story audio/video/img/char assets](https://github.com/akgcc/arkdata/tree/main/assets)
+[story audio/video/img/char assets](https://torappu.prts.wiki)
 
 
 
