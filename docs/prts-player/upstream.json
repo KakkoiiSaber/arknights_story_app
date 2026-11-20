@@ -7,5 +7,6 @@
     "RoHMinSinkStd-UB.woff2",
     "SourceHanSansCN-Heavy.woff2"
   ],
-  "hostProtocol": 1
+  "hostProtocol": 1,
+  "hostRevision": "7dd7d3aa059eb3d1098d08d08e03d0fc981c9930"
 }
