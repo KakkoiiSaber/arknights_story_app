@@ -48,7 +48,7 @@ jobs:
       - name: Build Flutter Web
         run: |
           dart run tool/package_player.dart
-          flutter build web --release --base-href /arknights_story_app/ --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
+          flutter build web --release --no-web-resources-cdn --base-href /arknights_story_app/ --dart-define="SUPABASE_URL=$SUPABASE_URL" --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
           npm run stage:player
 
       - name: Update docs folder
